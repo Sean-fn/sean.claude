@@ -191,29 +191,35 @@ def main():
 
     # --- Build parts ---
     parts = []
+    r = "\033[0m"
 
     # Context window bar
     if ctx_pct is not None:
         bar = make_ctx_bar(ctx_pct)
         parts.append(f"{bar}{round(ctx_pct)}%")
 
-    # 5h usage with actual/expected
+    # 5h usage with actual/expected, colored
     blocks_5h  = make_blocks(five["utilization"])
     actual_5h  = round(five["utilization"])
     exp_5h_int = round(exp_5h)
-    parts.append(f"5h {blocks_5h} {actual_5h}%/{exp_5h_int}%")
+    if actual_5h <= exp_5h:
+        c5 = "\033[32m"
+    elif actual_5h <= exp_5h + 10:
+        c5 = "\033[33m"
+    else:
+        c5 = "\033[31m"
+    parts.append(f"5h {blocks_5h} {c5}{actual_5h}%{r}/{exp_5h_int}%")
 
     # 7d usage with actual/expected, colored
     blocks_7d  = make_blocks(seven["utilization"])
     actual_7d  = round(seven["utilization"])
     exp_7d_int = round(exp_7d)
     if actual_7d <= exp_7d:
-        c7 = "\033[32m"   # green = under pace
+        c7 = "\033[32m"
     elif actual_7d <= exp_7d + 10:
-        c7 = "\033[33m"   # yellow
+        c7 = "\033[33m"
     else:
-        c7 = "\033[31m"   # red
-    r = "\033[0m"
+        c7 = "\033[31m"
     parts.append(f"7d {blocks_7d} {c7}{actual_7d}%{r}/{exp_7d_int}%")
 
     # Message count
