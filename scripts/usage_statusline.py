@@ -2,7 +2,7 @@
 """
 Claude Code usage statusline script.
 Fetches real-time usage from Anthropic's OAuth usage API with caching.
-Output: 5h: 43%/59% · 7d: 35%/42%
+Output: [█░░░░░░░░░]17% · 5h □□□□□ 17% · 7d ■■□□□ 43%/59% · 💬 38 · $0.48
 """
 import json
 import os
@@ -19,14 +19,70 @@ API_URL = "https://api.anthropic.com/api/oauth/usage"
 FIVE_HOURS = 5 * 3600
 SEVEN_DAYS = 7 * 86400
 
+CONTEXT_LIMITS = {
+    "claude-opus":   200_000,
+    "claude-sonnet": 200_000,
+    "claude-haiku":  200_000,
+}
 
-def drain_stdin():
-    """Claude Code pipes session JSON to stdin — drain it without blocking."""
-    if not sys.stdin.isatty():
-        try:
-            sys.stdin.read()
-        except Exception:
-            pass
+
+def parse_stdin():
+    """Parse Claude Code's session JSON from stdin."""
+    if sys.stdin.isatty():
+        return {}
+    try:
+        return json.loads(sys.stdin.read())
+    except Exception:
+        return {}
+
+
+def get_context_limit(model_id):
+    for prefix, limit in CONTEXT_LIMITS.items():
+        if prefix in model_id:
+            return limit
+    return 200_000  # safe default
+
+
+def read_transcript(path):
+    """Returns (msg_count, last_input_tokens) from JSONL session file."""
+    msg_count = 0
+    last_input_tokens = 0
+    if not path:
+        return msg_count, last_input_tokens
+    try:
+        with open(path) as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                entry = json.loads(line)
+                if entry.get("type") == "assistant":
+                    msg_count += 1
+                    usage = entry.get("message", {}).get("usage", {})
+                    t = (usage.get("input_tokens", 0)
+                         + usage.get("cache_creation_input_tokens", 0)
+                         + usage.get("cache_read_input_tokens", 0))
+                    if t:
+                        last_input_tokens = t
+    except Exception:
+        pass
+    return msg_count, last_input_tokens
+
+
+def make_ctx_bar(pct, width=10):
+    """[█░░░░░░░░░] style bar, colored by threshold."""
+    filled = min(width, round(pct / 100 * width))
+    bar = "[" + "█" * filled + "░" * (width - filled) + "]"
+    if pct >= 90:
+        return f"\033[31m{bar}\033[0m"   # red
+    elif pct >= 70:
+        return f"\033[33m{bar}\033[0m"   # yellow
+    return f"\033[32m{bar}\033[0m"        # green
+
+
+def make_blocks(pct, width=5, fill="■", empty="□"):
+    """■■□□□ style block bar."""
+    filled = min(width, round(pct / 100 * width))
+    return fill * filled + empty * (width - filled)
 
 
 def load_cache():
@@ -86,31 +142,18 @@ def expected_pct(resets_at_str, window_seconds):
     return max(0.0, min(100.0, pct))
 
 
-def format_bar(actual, expected):
-    """Return colored 'actual%/expected%' string using ANSI if supported."""
-    use_color = sys.stdout.isatty() or os.environ.get("COLORTERM") or os.environ.get("TERM", "").startswith("xterm")
-    actual_int = round(actual)
-    expected_int = round(expected)
-
-    if use_color:
-        if actual <= expected:
-            # Under pace — green
-            color = "\033[32m"
-        elif actual <= expected + 10:
-            # Slightly over — yellow
-            color = "\033[33m"
-        else:
-            # Well over — red
-            color = "\033[31m"
-        reset = "\033[0m"
-        return f"{color}{actual_int}%{reset}/{expected_int}%"
-    else:
-        return f"{actual_int}%/{expected_int}%"
-
-
 def main():
-    drain_stdin()
+    session = parse_stdin()
+    cost_usd   = session.get("cost", {}).get("total_cost_usd")
+    model_id   = session.get("model", {}).get("id", "")
+    transcript = session.get("transcript_path", "")
 
+    # --- Transcript data ---
+    msg_count, last_tokens = read_transcript(transcript)
+    ctx_limit = get_context_limit(model_id)
+    ctx_pct = (last_tokens / ctx_limit * 100) if last_tokens else None
+
+    # --- API usage (cached) ---
     cached_data, cache_age = load_cache()
     stale_suffix = ""
     data = None
@@ -125,31 +168,60 @@ def main():
         except HTTPError as e:
             if e.code == 429 and cached_data is not None:
                 data = cached_data
-                stale_suffix = " (cached)"
+                stale_suffix = "~"
             else:
-                print(f"API err {e.code}", end="")
+                print("usage: err", end="")
                 sys.exit(0)
-        except Exception as e:
+        except Exception:
             if cached_data is not None:
                 data = cached_data
-                stale_suffix = " (cached)"
+                stale_suffix = "~"
             else:
                 print("usage: err", end="")
                 sys.exit(0)
 
     try:
-        five = data["five_hour"]
+        five  = data["five_hour"]
         seven = data["seven_day"]
-
-        exp_5h = expected_pct(five["resets_at"], FIVE_HOURS)
         exp_7d = expected_pct(seven["resets_at"], SEVEN_DAYS)
-
-        bar_5h = format_bar(five["utilization"], exp_5h)
-        bar_7d = format_bar(seven["utilization"], exp_7d)
-
-        print(f"5h: {bar_5h} · 7d: {bar_7d}{stale_suffix}", end="")
     except (KeyError, TypeError):
         print("usage: parse err", end="")
+        return
+
+    # --- Build parts ---
+    parts = []
+
+    # Context window bar
+    if ctx_pct is not None:
+        bar = make_ctx_bar(ctx_pct)
+        parts.append(f"{bar}{round(ctx_pct)}%")
+
+    # 5h usage
+    blocks_5h = make_blocks(five["utilization"])
+    parts.append(f"5h {blocks_5h} {round(five['utilization'])}%")
+
+    # 7d usage with actual/expected, colored
+    blocks_7d  = make_blocks(seven["utilization"])
+    actual_7d  = round(seven["utilization"])
+    exp_7d_int = round(exp_7d)
+    if actual_7d <= exp_7d:
+        c7 = "\033[32m"   # green = under pace
+    elif actual_7d <= exp_7d + 10:
+        c7 = "\033[33m"   # yellow
+    else:
+        c7 = "\033[31m"   # red
+    r = "\033[0m"
+    parts.append(f"7d {blocks_7d} {c7}{actual_7d}%{r}/{exp_7d_int}%")
+
+    # Message count
+    if msg_count:
+        parts.append(f"💬 {msg_count}")
+
+    # Session cost
+    if cost_usd is not None:
+        parts.append(f"${cost_usd:.2f}")
+
+    print(" · ".join(parts) + stale_suffix, end="")
 
 
 if __name__ == "__main__":
