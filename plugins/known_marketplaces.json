@@ -1,0 +1,19 @@
+{
+  "claude-plugins-official": {
+    "source": {
+      "source": "github",
+      "repo": "anthropics/claude-plugins-official"
+    },
+    "installLocation": "/Users/sean/.claude/plugins/marketplaces/claude-plugins-official",
+    "lastUpdated": "2026-03-07T08:34:36.859Z"
+  },
+  "tool-cc-forge": {
+    "source": {
+      "source": "directory",
+      "path": "/Users/sean/gofreight/tool-cc-forge"
+    },
+    "installLocation": "/Users/sean/gofreight/tool-cc-forge",
+    "lastUpdated": "2026-03-06T02:54:49.680Z",
+    "autoUpdate": true
+  }
+}

@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+
+# 對話與操作歷史（隱私 + 龐大）
+history.jsonl
+file-history/
+_logs/
+
+# Runtime 暫存狀態
+debug/
+session-env/
+shell-snapshots/
+ide/
+todos/
+plans/
+tasks/
+
+# Cache
+cache/
+image-cache/
+paste-cache/
+
+# 統計 & 遙測
+stats-cache.json
+mcp-needs-auth-cache.json
+telemetry/
+statsig/
+
+# Per-project memory（含工作內容）
+projects/
+
+# 本地權限設定（含隱私，不應共用）
+settings.local.json
+
+# backups（可選，視需求決定）
+backups/
+
+# _voices（TTS 相關音訊，通常不需版控）
+_voices/
