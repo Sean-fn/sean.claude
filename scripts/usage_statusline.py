@@ -183,6 +183,7 @@ def main():
     try:
         five  = data["five_hour"]
         seven = data["seven_day"]
+        exp_5h = expected_pct(five["resets_at"], FIVE_HOURS)
         exp_7d = expected_pct(seven["resets_at"], SEVEN_DAYS)
     except (KeyError, TypeError):
         print("usage: parse err", end="")
@@ -196,9 +197,11 @@ def main():
         bar = make_ctx_bar(ctx_pct)
         parts.append(f"{bar}{round(ctx_pct)}%")
 
-    # 5h usage
-    blocks_5h = make_blocks(five["utilization"])
-    parts.append(f"5h {blocks_5h} {round(five['utilization'])}%")
+    # 5h usage with actual/expected
+    blocks_5h  = make_blocks(five["utilization"])
+    actual_5h  = round(five["utilization"])
+    exp_5h_int = round(exp_5h)
+    parts.append(f"5h {blocks_5h} {actual_5h}%/{exp_5h_int}%")
 
     # 7d usage with actual/expected, colored
     blocks_7d  = make_blocks(seven["utilization"])
