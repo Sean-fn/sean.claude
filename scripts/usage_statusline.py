@@ -85,6 +85,15 @@ def make_blocks(pct, width=5, fill="■", empty="□"):
     return fill * filled + empty * (width - filled)
 
 
+def fmt_tokens(n):
+    """Format token count: 45200 -> '45.2k tok', 1200 -> '1.2k tok', 800 -> '800 tok'"""
+    if n >= 100_000:
+        return f"{n // 1000}k tok"
+    elif n >= 1_000:
+        return f"{n / 1000:.1f}k tok"
+    return f"{n} tok"
+
+
 def load_cache():
     """Return (data, age_seconds) or (None, None) if cache missing/invalid."""
     try:
@@ -190,15 +199,19 @@ def main():
         return
 
     # --- Build parts ---
-    parts = []
+    line1 = []
+    line2 = []
+    line3 = []
     r = "\033[0m"
 
-    # Context window bar
+    # Line 1: context bar · message count
     if ctx_pct is not None:
         bar = make_ctx_bar(ctx_pct)
-        parts.append(f"{bar}{round(ctx_pct)}%")
+        line1.append(f"{bar}{round(ctx_pct)}%")
+    if msg_count:
+        line1.append(f"💬 {msg_count}")
 
-    # 5h usage with actual/expected, colored
+    # Line 2: 5h · cost
     blocks_5h  = make_blocks(five["utilization"])
     actual_5h  = round(five["utilization"])
     exp_5h_int = round(exp_5h)
@@ -208,9 +221,11 @@ def main():
         c5 = "\033[33m"
     else:
         c5 = "\033[31m"
-    parts.append(f"5h {blocks_5h} {c5}{actual_5h}%{r}/{exp_5h_int}%")
+    line2.append(f"5h {blocks_5h} {c5}{actual_5h}%{r}/{exp_5h_int}%")
+    if cost_usd is not None:
+        line2.append(f"${cost_usd:.2f}")
 
-    # 7d usage with actual/expected, colored
+    # Line 3: 7d · tok
     blocks_7d  = make_blocks(seven["utilization"])
     actual_7d  = round(seven["utilization"])
     exp_7d_int = round(exp_7d)
@@ -220,17 +235,12 @@ def main():
         c7 = "\033[33m"
     else:
         c7 = "\033[31m"
-    parts.append(f"7d {blocks_7d} {c7}{actual_7d}%{r}/{exp_7d_int}%")
+    line3.append(f"7d {blocks_7d} {c7}{actual_7d}%{r}/{exp_7d_int}%")
+    if last_tokens:
+        line3.append(fmt_tokens(last_tokens))
 
-    # Message count
-    if msg_count:
-        parts.append(f"💬 {msg_count}")
-
-    # Session cost
-    if cost_usd is not None:
-        parts.append(f"${cost_usd:.2f}")
-
-    print(" · ".join(parts) + stale_suffix, end="")
+    lines = [" · ".join(line1), " · ".join(line2), " · ".join(line3)]
+    print("\n".join(lines) + stale_suffix, end="")
 
 
 if __name__ == "__main__":
