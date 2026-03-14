@@ -6,10 +6,10 @@ Output: [█░░░░░░░░░]17% · 5h □□□□□ 17% · 7d ■�
 """
 import json
 import os
-import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -85,6 +85,17 @@ def make_blocks(pct, width=5, fill="■", empty="□"):
     return fill * filled + empty * (width - filled)
 
 
+def fmt_model(model_id):
+    """Shorten model id for display: 'claude-sonnet-4-6' -> 'sonnet-4.6'"""
+    for prefix in ("claude-opus-", "claude-sonnet-", "claude-haiku-"):
+        if model_id.startswith(prefix):
+            version = model_id[len(prefix):]          # e.g. "4-6"
+            version = version.replace("-", ".")        # e.g. "4.6"
+            family = prefix.split("-")[1]              # e.g. "sonnet"
+            return f"{family}-{version}"
+    return model_id  # fallback: raw id
+
+
 def fmt_tokens(n):
     """Format token count: 45200 -> '45.2k tok', 1200 -> '1.2k tok', 800 -> '800 tok'"""
     if n >= 100_000:
@@ -114,16 +125,10 @@ def save_cache(data):
 
 
 def get_token():
-    """Retrieve OAuth access token from macOS Keychain."""
-    result = subprocess.run(
-        ["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
-        capture_output=True,
-        text=True,
-        timeout=5,
-    )
-    if result.returncode != 0:
-        raise RuntimeError("keychain lookup failed")
-    creds = json.loads(result.stdout.strip())
+    """Retrieve OAuth access token from ~/.claude/.credentials.json."""
+    creds_path = Path.home() / ".claude" / ".credentials.json"
+    with open(creds_path) as f:
+        creds = json.load(f)
     return creds["claudeAiOauth"]["accessToken"]
 
 
@@ -210,6 +215,8 @@ def main():
         line1.append(f"{bar}{round(ctx_pct)}%")
     if msg_count:
         line1.append(f"💬 {msg_count}")
+    if model_id:
+        line1.append(fmt_model(model_id))
 
     # Line 2: 5h · cost
     blocks_5h  = make_blocks(five["utilization"])
@@ -224,6 +231,7 @@ def main():
     line2.append(f"5h {blocks_5h} {c5}{actual_5h}%{r}/{exp_5h_int}%")
     if cost_usd is not None:
         line2.append(f"${cost_usd:.2f}")
+    line2.append(os.uname().nodename.split(".")[0])
 
     # Line 3: 7d · tok
     blocks_7d  = make_blocks(seven["utilization"])
