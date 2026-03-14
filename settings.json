@@ -159,20 +159,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "afplay \"$(ls ~/.claude/_voices/*.mp3 | sort -R | head -n 1)\""
-          },
-          {
-            "type": "command",
-            "command": "output=$(python3 $HOME/.claude/_hooks/extract_mermaids.py); [ -n \"$output\" ] && echo \"$output\" | homo || true",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
+            "command": "ssh sean@mba 'afplay \"$(ls ~/.claude/_voices/*.mp3 | sort -R | head -n 1)\"'"
           }
         ]
       }
