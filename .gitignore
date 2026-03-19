@@ -25,6 +25,7 @@ plugins/install-counts-cache.json
 plugins/installed_plugins.json
 plugins/known_marketplaces.json
 plugins/blocklist.json
+plugins/config.json
 plugins/marketplaces/claude-plugins-official
 
 # 統計 & 遙測
