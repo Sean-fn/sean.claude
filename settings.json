@@ -38,28 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "afplay \"$(ls ~/.claude/_voices/*.mp3 | sort -R | head -n 1)\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
-          }
-        ]
-      }
-    ],
-    "PermissionRequest": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py",
-            "timeout": 86400
+            "command": "bash ~/.claude/hooks/audio/play_with_mic_check.sh"
           }
         ]
       }
@@ -71,35 +50,6 @@
           {
             "type": "command",
             "command": "jq -r '.tool_input.file_path' | { read file_path; if echo \"$file_path\" | grep -q '\\.py$'; then pre-commit run --files  \"$file_path\" 2>/dev/null; fi; }"
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "auto",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
-          }
-        ]
-      },
-      {
-        "matcher": "manual",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
           }
         ]
       }
@@ -114,31 +64,13 @@
           }
         ]
       },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "jq -r '.tool_input.command' >> ~/.claude/_logs/bash-command-log.txt"
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
-          }
-        ]
-      }
     ],
     "SessionEnd": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
+            "command": "echo play_end_sound"
           }
         ]
       }
@@ -148,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
+            "command": "echo play_launch_sound"
           }
         ]
       }
@@ -159,7 +91,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ssh sean@mba 'afplay \"$(ls ~/.claude/_voices/*.mp3 | sort -R | head -n 1)\"'"
+            "command": "bash ~/.claude/hooks/audio/play_with_mic_check.sh"
           }
         ]
       }
@@ -169,7 +101,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
+            "command": "echo Subagent_stopped"
           }
         ]
       }
@@ -179,7 +111,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claude/hooks/claude-island-state.py"
+            "command": "echo Sent"
           }
         ]
       }
@@ -187,7 +119,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "python3 /Users/sean/.claude/scripts/usage_statusline.py"
+    "command": "python3 /Users/sean/.claude/hooks/statusline/usage_statusline.py"
   },
   "enabledPlugins": {
     "gf-jira@tool-cc-forge": true,
