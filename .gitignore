@@ -9,16 +9,19 @@ _logs/
 # Runtime 暫存狀態
 debug/
 session-env/
+sessions/
 shell-snapshots/
 ide/
 todos/
 plans/
 tasks/
+hooks/audio/mic_status
 
 # Cache
 cache/
 image-cache/
 paste-cache/
+plugins/install-counts-cache.json
 
 # 統計 & 遙測
 stats-cache.json
@@ -34,6 +37,3 @@ settings.local.json
 
 # backups（可選，視需求決定）
 backups/
-
-# _voices（TTS 相關音訊，通常不需版控）
-_voices/
