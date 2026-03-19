@@ -22,6 +22,10 @@ cache/
 image-cache/
 paste-cache/
 plugins/install-counts-cache.json
+plugins/installed_plugins.json
+plugins/known_marketplaces.json
+plugins/blocklist.json
+plugins/marketplaces/claude-plugins-official
 
 # 統計 & 遙測
 stats-cache.json
