@@ -4,8 +4,10 @@ Claude Code usage statusline script.
 Fetches real-time usage from Anthropic's OAuth usage API with caching.
 Output: [█░░░░░░░░░]17% · 5h □□□□□ 17% · 7d ■■□□□ 43%/59% · 💬 38 · $0.48
 """
+import getpass
 import json
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -124,12 +126,94 @@ def save_cache(data):
         pass
 
 
-def get_token():
-    """Retrieve OAuth access token from ~/.claude/.credentials.json."""
+OAUTH_REFRESH_URL = "https://claude.ai/api/auth/oauth/token"
+KEYCHAIN_SERVICE = "Claude Code-credentials"
+
+
+def load_oauth_from_keychain() -> dict:
+    """Read OAuth JSON from macOS Keychain. Raises KeyError on failure."""
+    result = subprocess.run(
+        ["security", "find-generic-password",
+         "-s", KEYCHAIN_SERVICE, "-a", getpass.getuser(), "-w"],
+        capture_output=True, text=True, timeout=5,
+    )
+    if result.returncode != 0:
+        raise KeyError("credentials not found in Keychain")
+    return json.loads(result.stdout.strip())
+
+
+def is_token_expired(oauth: dict) -> bool:
+    expires_at_ms = oauth.get("expiresAt", 0)
+    return time.time() * 1000 >= expires_at_ms - 60_000
+
+
+def refresh_access_token(refresh_token: str) -> dict:
+    """Exchange refresh_token for new tokens. Returns {access_token, refresh_token, expires_in}."""
+    body = f"grant_type=refresh_token&refresh_token={refresh_token}".encode()
+    req = Request(
+        OAUTH_REFRESH_URL,
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode())
+
+
+def get_token() -> str:
+    """Return a valid OAuth access token, refreshing if expired.
+
+    Source priority: macOS Keychain → ~/.claude/.credentials.json
+    Both sources store { claudeAiOauth: { accessToken, refreshToken, expiresAt, ... } }.
+    """
     creds_path = Path.home() / ".claude" / ".credentials.json"
-    with open(creds_path) as f:
-        creds = json.load(f)
-    return creds["claudeAiOauth"]["accessToken"]
+    source = None
+    oauth = None
+    blob = None  # full JSON blob (with claudeAiOauth wrapper) for write-back
+
+    try:
+        blob = load_oauth_from_keychain()
+        oauth = blob["claudeAiOauth"]
+        source = "keychain"
+    except Exception:
+        pass
+
+    if oauth is None:
+        try:
+            blob = json.loads(creds_path.read_text())
+            oauth = blob["claudeAiOauth"]
+            source = "file"
+        except FileNotFoundError:
+            raise RuntimeError("no credentials found — run `claude login` first")
+
+    if not is_token_expired(oauth):
+        return oauth["accessToken"]
+
+    new_tokens = refresh_access_token(oauth["refreshToken"])
+
+    oauth["accessToken"] = new_tokens["access_token"]
+    oauth["refreshToken"] = new_tokens.get("refresh_token", oauth["refreshToken"])
+    expires_in_ms = new_tokens.get("expires_in", 3600) * 1000
+    oauth["expiresAt"] = int(time.time() * 1000) + expires_in_ms
+    blob["claudeAiOauth"] = oauth
+
+    if source == "keychain":
+        try:
+            subprocess.run(
+                ["security", "add-generic-password",
+                 "-U", "-s", KEYCHAIN_SERVICE, "-a", getpass.getuser(),
+                 "-w", json.dumps(blob)],
+                capture_output=True, timeout=5,
+            )
+        except Exception:
+            pass  # non-fatal: token is valid, just won't persist in Keychain
+    else:
+        try:
+            creds_path.write_text(json.dumps(blob))
+        except Exception:
+            pass  # non-fatal
+
+    return oauth["accessToken"]
 
 
 def fetch_usage(token):
