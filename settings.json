@@ -119,7 +119,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "python3 /Users/sean/.claude/hooks/statusline/usage_statusline.py"
+    "command": "bash /Users/sean/.claude/hooks/statusline/usage_statusline.sh"
   },
   "enabledPlugins": {
     "gf-jira@tool-cc-forge": true,
