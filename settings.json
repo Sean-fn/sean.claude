@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/audio/play_with_mic_check.sh"
+            "command": "bash ~/.claude/hooks/audio/voice_notify.sh"
           }
         ]
       }
@@ -91,7 +91,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/audio/play_with_mic_check.sh"
+            "command": "bash ~/.claude/hooks/audio/voice_notify.sh"
           }
         ]
       }

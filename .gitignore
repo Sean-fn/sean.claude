@@ -42,3 +42,7 @@ settings.local.json
 
 # backups（可選，視需求決定）
 backups/
+
+generated/
+
+skills/
