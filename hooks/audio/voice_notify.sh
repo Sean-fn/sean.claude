@@ -52,15 +52,15 @@ if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
         | cut -c1-300)
 fi
 
-PROMPT="Turn this CLI notification into a spoken alert. Max 6 words. Snarky. No quotes, no emoji, no markdown. Just the sentence. Reference what the user is actually working on.
+PROMPT="Turn this CLI notification into a spoken alert. around 5-8 words. Snarky. No quotes, no emoji, no markdown. Just the sentence. Reference what the user is actually working on. You can use GEN-Z language or qurky formal tone wiht different emotion if suitable. DO NOT MENTION THE WORD 'Claude' IN THE RESPONSE
 
 Type: $NOTIFICATION_TYPE
 Message: $MESSAGE
 Recent conversation: $CONTEXT"
 
 # Generate spoken text via Gemini; fall back to random clip if it fails
-if ! SPOKEN=$(echo "" | gemini -m gemini-2.5-flash-lite -p "$PROMPT" 2>/dev/null) || [ -z "$SPOKEN" ]; then
-    echo "Gemini generation failed or returned empty\n"STDERR/STDOUT: $SPOKEN"" >> "$LOG"
+if ! SPOKEN=$(echo "" | ollama run glm-5.1:cloud --think=false "$PROMPT" 2>/dev/null) || [ -z "$SPOKEN" ]; then
+    echo "LLM generation failed or returned empty\n"STDERR/STDOUT: $SPOKEN"" >> "$LOG"
     play_random
     exit 0
 fi
@@ -86,4 +86,4 @@ jq -nc \
     --argjson tts_ms "$TTS_MS" \
     '{ts: $ts, payload: $payload, context: $context, spoken: $spoken, tts_ms: $tts_ms}' >> "$LOG"
 
-afplay -v "${CLAUDE_TTS_VOLUME:-2.0}" "$OUTFILE"
+afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$OUTFILE"
