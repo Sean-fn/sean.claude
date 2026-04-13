@@ -27,8 +27,9 @@ eval "$(echo "$input" | jq -r '
 
   # Cost + duration
   (.cost.total_cost_usd // 0) as $cost |
-  ((.cost.total_duration_ms // 0) / 60000 | floor) as $dur_min |
-  (((.cost.total_duration_ms // 0) % 60000) / 1000 | floor) as $dur_sec |
+  ((.cost.total_duration_ms // 0) / 1000 | floor) as $dur_tot_s |
+  ($dur_tot_s / 60 | floor) as $dur_min |
+  ($dur_tot_s % 60) as $dur_sec |
 
   # Model shortening: claude-sonnet-4-6 -> sonnet-4.6
   (.model.id // "" | gsub("^claude-"; "") | gsub("-(?<v>[0-9]+)-(?<p>[0-9]+)$"; "-\(.v).\(.p)")) as $model |
@@ -39,10 +40,17 @@ eval "$(echo "$input" | jq -r '
   [
     "R5=\($r5)", "E5=\($e5)", "R7=\($r7)", "E7=\($e7)",
     "CTX=\($ctx)", "TOK=\($tok)",
-    "COST=\($cost)", "DUR_M=\($dur_min)", "DUR_S=\($dur_sec)",
+    "COST=\($cost)", "DUR_M=\($dur_min)", "DUR_S=\($dur_sec)", "DUR_TOT_S=\($dur_tot_s)",
     "MODEL=\($model)", "FOLDER=\($folder)"
   ] | .[] | . + ""
 ')"
+
+# --- Burn rates (tok/min and $/min) ---
+if [[ $DUR_TOT_S -gt 0 ]]; then
+  COST_RATE_FMT=$(awk "BEGIN { printf \"\$%.4f/m\", $COST / ($DUR_TOT_S / 60) }")
+else
+  COST_RATE_FMT="\$0.0000/m"
+fi
 
 # --- Colors ---
 G='\033[32m'; Y='\033[33m'; R='\033[31m'; C='\033[36m'; D='\033[2m'; B='\033[1m'; X='\033[0m'
@@ -123,8 +131,7 @@ elif [[ $CTX -ge 70 ]]; then CTX_CLR="$Y"
 else CTX_CLR="$G"
 fi
 
-TOK_FMT=$(fmt_tok "$TOK")
-LINE3="ctx ${CTX_CLR}${BAR_CTX}${X} ${CTX}% ${D}·${X} ${TOK_FMT}"
+LINE3="ctx ${CTX_CLR}${BAR_CTX}${X} ${CTX}%"
 
 # ╔══════════════════════════════════════════════════════════╗
 # ║  LINE 4: folder · branch                                ║
@@ -132,6 +139,7 @@ LINE3="ctx ${CTX_CLR}${BAR_CTX}${X} ${CTX}% ${D}·${X} ${TOK_FMT}"
 LINE4=""
 [[ -n "$FOLDER" ]] && LINE4+="📁 ${FOLDER}"
 [[ -n "$BRANCH" ]] && LINE4+=" ${D}·${X} ⎇ ${BRANCH}"
+LINE4+=" ${D}·${X} ${Y}${COST_RATE_FMT}${X}"
 
 # --- Output with box-drawing (echo -e per line, per docs) ---
 echo -e "┌ ${LINE1}"
