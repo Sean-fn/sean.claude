@@ -69,12 +69,18 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 SAFE_NAME=$(echo "$SPOKEN" | tr -cd '[:alnum:] ' | tr ' ' '_' | cut -c1-60)
 OUTFILE="$GENERATED_DIR/${TIMESTAMP}_${SAFE_NAME}.mp3"
 
-# Call the persistent TTS server; fall back to random clip if server is down
-TTS_RESPONSE=$(curl -sf -G "http://localhost:7865/speak" \
+# Call remote TTS first; if it fails, run local Python TTS directly.
+# If both fail, play a random clip.
+TTS_RESPONSE=$(curl -sf -G "http://100.90.252.116:7865/speak" \
     --data-urlencode "text=$SPOKEN" \
     --data-urlencode "output=$OUTFILE" \
     --data-urlencode "instruct=speak clearly" \
-    --max-time 30 2>/dev/null) || { play_random; exit 0; }
+    --max-time 30 2>/dev/null) || \
+TTS_RESPONSE=$(uv run "$SCRIPT_DIR/tts_server/tts_server.py" \
+    --oneshot \
+    --text "$SPOKEN" \
+    --output "$OUTFILE" \
+    --instruct "speak clearly" 2>/dev/null) || { play_random; exit 0; }
 
 TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms')
 
