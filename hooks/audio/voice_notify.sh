@@ -36,8 +36,15 @@ if "$SCRIPT_DIR/mic_status" 2>/dev/null; then
 fi
 
 play_random() {
-    local clips=("$VOICE_DIR_BASE/user_action/"*.mp3)
-    play_audio "${clips[RANDOM % ${#clips[@]}]}"
+    if [ "$IS_REMOTE" = true ]; then
+        ssh "${TARGET_SSH}" "
+            clips=(\"/Users/sean/.claude/hooks/audio/_voices/user_action/\"*.mp3)
+            afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' \"\${clips[RANDOM % \${#clips[@]}]}\"
+        "
+    else
+        local clips=("$VOICE_DIR_BASE/user_action/"*.mp3)
+        afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "${clips[RANDOM % ${#clips[@]}]}"
+    fi
 }
 
 # Toggle: "generated" = Gemini + TTS on the fly, "random" = pick from pre-recorded clips
@@ -104,13 +111,13 @@ if [ "$IS_REMOTE" = true ]; then
         | ssh "${TARGET_SSH}" "cat > '${REMOTE_FILE}'" \
         && ssh "${TARGET_SSH}" "[ -s '${REMOTE_FILE}' ]"; then
         TTS_MS=0
-    elif TTS_RESPONSE=$(uv run "$SCRIPT_DIR/tts_server/tts_server.py" \
-        --oneshot \
-        --text "$SPOKEN" \
-        --output "$OUTFILE" \
-        --instruct "speak clearly" 2>/dev/null); then
-        TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
-        scp -q "$OUTFILE" "${TARGET_SSH}:${REMOTE_FILE}"
+    # elif TTS_RESPONSE=$(uv run "$SCRIPT_DIR/tts_server/tts_server.py" \
+    #     --oneshot \
+    #     --text "$SPOKEN" \
+    #     --output "$OUTFILE" \
+    #     --instruct "speak clearly" 2>/dev/null); then
+    #     TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
+    #     scp -q "$OUTFILE" "${TARGET_SSH}:${REMOTE_FILE}"
     else
         play_random
         exit 0
@@ -122,12 +129,12 @@ else
         --max-time 30 \
         -o "$OUTFILE" 2>/dev/null && [ -s "$OUTFILE" ]; then
         TTS_MS=0
-    elif TTS_RESPONSE=$(uv run "$SCRIPT_DIR/tts_server/tts_server.py" \
-        --oneshot \
-        --text "$SPOKEN" \
-        --output "$OUTFILE" \
-        --instruct "speak clearly" 2>/dev/null); then
-        TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
+    # elif TTS_RESPONSE=$(uv run "$SCRIPT_DIR/tts_server/tts_server.py" \
+    #     --oneshot \
+    #     --text "$SPOKEN" \
+    #     --output "$OUTFILE" \
+    #     --instruct "speak clearly" 2>/dev/null); then
+    #     TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
     else
         play_random
         exit 0
