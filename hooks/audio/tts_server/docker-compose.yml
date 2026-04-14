@@ -1,0 +1,9 @@
+services:
+  tts-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tts-server
+    restart: always
+    ports:
+      - "7865:7865"
