@@ -7,15 +7,37 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VOICE_DIR_BASE="$SCRIPT_DIR/_voices"
 
+# Detect whether audio should play locally or on the target machine
+TARGET_IP="100.93.183.121"
+TARGET_SSH="sean@${TARGET_IP}"
+
+if ifconfig 2>/dev/null | grep -q "inet ${TARGET_IP}"; then
+    IS_REMOTE=false
+else
+    IS_REMOTE=true
+fi
+
+# play_audio: plays a local file either locally or on the target machine via SSH
+play_audio() {
+    local file="$1"
+    if [ "$IS_REMOTE" = true ]; then
+        local remote_file="/tmp/$(basename "$file")"
+        scp -q "$file" "${TARGET_SSH}:${remote_file}"
+        ssh "${TARGET_SSH}" "afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' '${remote_file}'"
+    else
+        afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$file"
+    fi
+}
+
 # Mic check: if recording, play a subtle pop and bail — don't interrupt the call
 if "$SCRIPT_DIR/mic_status" 2>/dev/null; then
-    afplay "$VOICE_DIR_BASE/sound_during_mic/mixkit-long-pop-2358.wav"
+    play_audio "$VOICE_DIR_BASE/sound_during_mic/mixkit-long-pop-2358.wav"
     exit 0
 fi
 
 play_random() {
     local clips=("$VOICE_DIR_BASE/user_action/"*.mp3)
-    afplay "${clips[RANDOM % ${#clips[@]}]}"
+    play_audio "${clips[RANDOM % ${#clips[@]}]}"
 }
 
 # Toggle: "generated" = Gemini + TTS on the fly, "random" = pick from pre-recorded clips
@@ -72,21 +94,44 @@ OUTFILE="$GENERATED_DIR/${TIMESTAMP}_${SAFE_NAME}.mp3"
 # Call remote TTS (returns binary MP3); if it fails, run local Python TTS.
 # If both fail, play a random clip.
 TTS_MS=0
-if curl -sf -G "http://100.90.252.116:7865/speak_stream" \
-    --data-urlencode "text=$SPOKEN" \
-    --data-urlencode "instruct=speak clearly" \
-    --max-time 30 \
-    -o "$OUTFILE" 2>/dev/null && [ -s "$OUTFILE" ]; then
-    TTS_MS=0
-elif TTS_RESPONSE=$(uv run "$SCRIPT_DIR/tts_server/tts_server.py" \
-    --oneshot \
-    --text "$SPOKEN" \
-    --output "$OUTFILE" \
-    --instruct "speak clearly" 2>/dev/null); then
-    TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
+if [ "$IS_REMOTE" = true ]; then
+    REMOTE_FILE="/tmp/$(basename "$OUTFILE")"
+    if curl -sf -G "http://100.90.252.116:7865/speak_stream" \
+        --data-urlencode "text=$SPOKEN" \
+        --data-urlencode "instruct=speak clearly" \
+        --max-time 30 \
+        2>/dev/null \
+        | ssh "${TARGET_SSH}" "cat > '${REMOTE_FILE}'" \
+        && ssh "${TARGET_SSH}" "[ -s '${REMOTE_FILE}' ]"; then
+        TTS_MS=0
+    elif TTS_RESPONSE=$(uv run "$SCRIPT_DIR/tts_server/tts_server.py" \
+        --oneshot \
+        --text "$SPOKEN" \
+        --output "$OUTFILE" \
+        --instruct "speak clearly" 2>/dev/null); then
+        TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
+        scp -q "$OUTFILE" "${TARGET_SSH}:${REMOTE_FILE}"
+    else
+        play_random
+        exit 0
+    fi
 else
-    play_random
-    exit 0
+    if curl -sf -G "http://100.90.252.116:7865/speak_stream" \
+        --data-urlencode "text=$SPOKEN" \
+        --data-urlencode "instruct=speak clearly" \
+        --max-time 30 \
+        -o "$OUTFILE" 2>/dev/null && [ -s "$OUTFILE" ]; then
+        TTS_MS=0
+    elif TTS_RESPONSE=$(uv run "$SCRIPT_DIR/tts_server/tts_server.py" \
+        --oneshot \
+        --text "$SPOKEN" \
+        --output "$OUTFILE" \
+        --instruct "speak clearly" 2>/dev/null); then
+        TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
+    else
+        play_random
+        exit 0
+    fi
 fi
 
 jq -nc \
@@ -97,4 +142,8 @@ jq -nc \
     --argjson tts_ms "$TTS_MS" \
     '{ts: $ts, payload: $payload, context: $context, spoken: $spoken, tts_ms: $tts_ms}' >> "$LOG"
 
-afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$OUTFILE"
+if [ "$IS_REMOTE" = true ]; then
+    ssh "${TARGET_SSH}" "afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' '${REMOTE_FILE}'"
+else
+    afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$OUTFILE"
+fi
