@@ -17,6 +17,50 @@ else
     IS_REMOTE=true
 fi
 
+# Source identifies who triggered this notification: claude | codex | subagent
+VOICE_SOURCE="${VOICE_SOURCE:-claude}"
+
+# Persona map: source → prompt style, TTS instruct string, and speaker voice.
+# Use case statements for compatibility with macOS's default Bash 3.2.
+prompt_style_for_source() {
+    case "$1" in
+        codex)
+            echo "Dry, terse, hacker tone. 5-8 words. 'Code shipped' energy. No fluff. Think git commit message energy."
+            ;;
+        subagent)
+            echo "Brief, robotic, slightly impatient. 5-8 words. Task done. Minimal personality."
+            ;;
+        *)
+            echo "Snarky Gen-Z. 5-8 words. Reference what the user is working on. You can use GEN-Z language or quirky formal tone with different emotion if suitable."
+            ;;
+    esac
+}
+
+tts_instruct_for_source() {
+    case "$1" in
+        codex)
+            echo "speak dryly, flat affect"
+            ;;
+        subagent)
+            echo "speak quickly, neutral"
+            ;;
+        *)
+            echo "speak clearly"
+            ;;
+    esac
+}
+
+tts_speaker_for_source() {
+    case "$1" in
+        codex)
+            echo "Aiden"
+            ;;
+        *)
+            echo "Ryan"
+            ;;
+    esac
+}
+
 # play_audio: plays a local file either locally or on the target machine via SSH
 play_audio() {
     local file="$1"
@@ -72,6 +116,16 @@ MESSAGE=$(echo "$PAYLOAD" | jq -r '.message // "Something happened"')
 NOTIFICATION_TYPE=$(echo "$PAYLOAD" | jq -r '.notification_type // "unknown"')
 TRANSCRIPT=$(echo "$PAYLOAD" | jq -r '.transcript_path // ""')
 
+# Auto-detect source refinements from payload
+SUBAGENT_TYPE=$(echo "$PAYLOAD" | jq -r '.subagent_type // ""')
+if [ "$VOICE_SOURCE" = "subagent" ] && echo "$SUBAGENT_TYPE" | grep -qi "codex"; then
+    VOICE_SOURCE="codex"
+fi
+
+PROMPT_STYLE="$(prompt_style_for_source "$VOICE_SOURCE")"
+TTS_INSTRUCT="$(tts_instruct_for_source "$VOICE_SOURCE")"
+TTS_SPEAKER="$(tts_speaker_for_source "$VOICE_SOURCE")"
+
 # Extract last assistant message from transcript (JSONL format)
 CONTEXT=""
 if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
@@ -81,7 +135,7 @@ if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
         | cut -c1-300)
 fi
 
-PROMPT="Turn this CLI notification into a spoken alert. around 5-8 words. Snarky. No quotes, no emoji, no markdown. Just the sentence. Reference what the user is actually working on. You can use GEN-Z language or qurky formal tone wiht different emotion if suitable. DO NOT MENTION THE WORD 'Claude' IN THE RESPONSE
+PROMPT="Turn this CLI notification into a spoken alert. ${PROMPT_STYLE} No quotes, no emoji, no markdown. Just the sentence. DO NOT MENTION THE WORD 'Claude' IN THE RESPONSE
 
 Type: $NOTIFICATION_TYPE
 Message: $MESSAGE
@@ -105,7 +159,8 @@ if [ "$IS_REMOTE" = true ]; then
     REMOTE_FILE="/tmp/$(basename "$OUTFILE")"
     if curl -sf -G "http://100.90.252.116:7865/speak_stream" \
         --data-urlencode "text=$SPOKEN" \
-        --data-urlencode "instruct=speak clearly" \
+        --data-urlencode "speaker=${TTS_SPEAKER}" \
+        --data-urlencode "instruct=${TTS_INSTRUCT}" \
         --max-time 30 \
         2>/dev/null \
         | ssh "${TARGET_SSH}" "cat > '${REMOTE_FILE}'" \
@@ -125,7 +180,8 @@ if [ "$IS_REMOTE" = true ]; then
 else
     if curl -sf -G "http://100.90.252.116:7865/speak_stream" \
         --data-urlencode "text=$SPOKEN" \
-        --data-urlencode "instruct=speak clearly" \
+        --data-urlencode "speaker=${TTS_SPEAKER}" \
+        --data-urlencode "instruct=${TTS_INSTRUCT}" \
         --max-time 30 \
         -o "$OUTFILE" 2>/dev/null && [ -s "$OUTFILE" ]; then
         TTS_MS=0
