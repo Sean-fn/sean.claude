@@ -23,6 +23,7 @@ Usage:
 import argparse
 import json
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -30,7 +31,7 @@ from typing import Any
 import numpy as np
 import soundfile as sf
 import torch
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from qwen_tts import Qwen3TTSModel
 
 DEFAULT_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
@@ -138,6 +139,25 @@ def speak():
         return jsonify({"error": str(exc)}), 500
 
     return jsonify({"output": output, "tts_ms": elapsed_ms})
+
+
+@app.route("/speak_stream", methods=["GET", "POST"])
+def speak_stream():
+    text, _, speaker, instruct, language = _parse_fields(_request_data())
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        _synthesize(text=text, output=tmp_path, speaker=speaker,
+                    instruct=instruct, language=language)
+    except Exception as exc:
+        Path(tmp_path).unlink(missing_ok=True)
+        return jsonify({"error": str(exc)}), 500
+
+    return send_file(tmp_path, mimetype="audio/mpeg",
+                     as_attachment=True, download_name="tts.mp3")
 
 
 @app.route("/health")
