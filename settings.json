@@ -26,7 +26,8 @@
       "Bash(jira issue view:*)",
       "Bash(jira issue list:*)",
       "Bash(gh pr list:*)",
-      "Bash(gh pr view:*)"
+      "Bash(gh pr view:*)",
+      "Bash(hf paper:*)"
     ],
     "deny": [],
     "defaultMode": "plan"
@@ -38,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/audio/voice_notify.sh"
+            "command": "VOICE_SOURCE=claude bash ~/.claude/hooks/audio/voice_notify.sh"
           }
         ]
       }
@@ -91,7 +92,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/audio/voice_notify.sh"
+            "command": "VOICE_SOURCE=claude bash ~/.claude/hooks/audio/voice_notify.sh"
           }
         ]
       }
@@ -101,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo Subagent_stopped"
+            "command": "VOICE_SOURCE=subagent bash ~/.claude/hooks/audio/voice_notify.sh"
           }
         ]
       }

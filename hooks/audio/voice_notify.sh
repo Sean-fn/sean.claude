@@ -80,6 +80,17 @@ play_random_with_notify() {
     play_random
 }
 
+fixed_audio_for_source() {
+    case "$1" in
+        codex)
+            echo "${CODEX_FIXED_AUDIO_FILE:-$VOICE_DIR_BASE/20260404_165050_Something_happened_Your_code_awaits.mp3}"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # play_audio: plays a local file either locally or on the target machine via SSH
 play_audio() {
     local file="$1"
@@ -141,6 +152,13 @@ if [ "$VOICE_SOURCE" = "subagent" ] && echo "$SUBAGENT_TYPE" | grep -qi "codex";
     VOICE_SOURCE="codex"
 fi
 
+# Temporarily bypass transcript parsing + TTS for Codex and play a fixed clip.
+FIXED_AUDIO_FILE="$(fixed_audio_for_source "$VOICE_SOURCE" || true)"
+if [ -n "$FIXED_AUDIO_FILE" ] && [ -f "$FIXED_AUDIO_FILE" ]; then
+    play_audio "$FIXED_AUDIO_FILE"
+    exit 0
+fi
+
 PROMPT_STYLE="$(prompt_style_for_source "$VOICE_SOURCE")"
 TTS_INSTRUCT="$(tts_instruct_for_source "$VOICE_SOURCE")"
 TTS_SPEAKER="$(tts_speaker_for_source "$VOICE_SOURCE")"
@@ -168,7 +186,7 @@ if ! curl -sf --max-time 5 "http://100.90.252.116:7865/health" > /dev/null 2>&1;
 fi
 
 # Generate spoken text via Gemini; fall back to random clip if it fails
-if ! SPOKEN=$(echo "" | ollama run gemini-3-flash-preview:cloud --think=false --hidethinking "$PROMPT" 2>/dev/null) || [ -z "$SPOKEN" ]; then
+if ! SPOKEN=$(echo "" | ollama run gemma3:4b-cloud --think=false --hidethinking "$PROMPT" 2>/dev/null) || [ -z "$SPOKEN" ]; then
     echo "LLM generation failed or returned empty\n"STDERR/STDOUT: $SPOKEN"" >> "$LOG"
     play_random_with_notify "llm_generation"
     exit 0

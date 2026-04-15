@@ -46,3 +46,11 @@ backups/
 generated/
 
 skills/
+
+*.pyc
+*.log
+.env
+access.json
+bot.pid
+*.out
+*.bak
