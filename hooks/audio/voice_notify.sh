@@ -61,6 +61,25 @@ tts_speaker_for_source() {
     esac
 }
 
+# notify_mac: fires a macOS push notification locally or on the target machine via SSH
+notify_mac() {
+    local title="$1"
+    local message="$2"
+    local script="display notification \"${message}\" with title \"${title}\""
+    if [ "$IS_REMOTE" = true ]; then
+        ssh "${TARGET_SSH}" "osascript -e '${script}'"
+    else
+        osascript -e "${script}"
+    fi
+}
+
+# play_random_with_notify: fallback helper — notify which stage failed, then play a random clip
+play_random_with_notify() {
+    local stage="$1"
+    notify_mac "Voice Notify" "Fallback to random clip [${stage}]"
+    play_random
+}
+
 # play_audio: plays a local file either locally or on the target machine via SSH
 play_audio() {
     local file="$1"
@@ -141,10 +160,17 @@ Type: $NOTIFICATION_TYPE
 Message: $MESSAGE
 Recent conversation: $CONTEXT"
 
+# Health-check TTS server before burning an LLM call
+if ! curl -sf --max-time 5 "http://100.90.252.116:7865/health" > /dev/null 2>&1; then
+    echo "TTS health check failed" >> "$LOG"
+    play_random_with_notify "tts_health_check"
+    exit 0
+fi
+
 # Generate spoken text via Gemini; fall back to random clip if it fails
-if ! SPOKEN=$(echo "" | ollama run glm-5.1:cloud --think=false "$PROMPT" 2>/dev/null) || [ -z "$SPOKEN" ]; then
+if ! SPOKEN=$(echo "" | ollama run gemini-3-flash-preview:cloud --think=false --hidethinking "$PROMPT" 2>/dev/null) || [ -z "$SPOKEN" ]; then
     echo "LLM generation failed or returned empty\n"STDERR/STDOUT: $SPOKEN"" >> "$LOG"
-    play_random
+    play_random_with_notify "llm_generation"
     exit 0
 fi
 
@@ -174,7 +200,7 @@ if [ "$IS_REMOTE" = true ]; then
     #     TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
     #     scp -q "$OUTFILE" "${TARGET_SSH}:${REMOTE_FILE}"
     else
-        play_random
+        play_random_with_notify "tts_stream_remote"
         exit 0
     fi
 else
@@ -192,7 +218,7 @@ else
     #     --instruct "speak clearly" 2>/dev/null); then
     #     TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
     else
-        play_random
+        play_random_with_notify "tts_stream_local"
         exit 0
     fi
 fi
