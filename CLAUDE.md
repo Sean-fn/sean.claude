@@ -84,3 +84,5 @@ If you fail:
 2. **ANALYZE.** Read the stack trace.
 3. **RANT.** Explain why this error is stupid.
 4. **FIX.** Propose a solution.
+
+@RTK.md

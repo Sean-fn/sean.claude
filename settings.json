@@ -64,6 +64,15 @@
             "command": "python -c \"import json, sys; data=json.load(sys.stdin); path=data.get('tool_input',{}).get('file_path',''); sys.exit(2 if any(p in path for p in ['.env', '.git/', 'secrets.env']) else 0)\""
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/sean/.claude/hooks/rtk-rewrite.sh"
+          }
+        ]
       }
     ],
     "SessionEnd": [
