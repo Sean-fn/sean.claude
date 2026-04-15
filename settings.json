@@ -136,7 +136,6 @@
     "gf-slack@tool-cc-forge": true
   },
   "outputStyle": "Explanatory",
-  "language": "繁體中文",
   "alwaysThinkingEnabled": true,
   "voiceEnabled": true,
   "skipDangerousModePermissionPrompt": true,
