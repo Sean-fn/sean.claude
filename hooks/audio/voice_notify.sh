@@ -62,6 +62,17 @@ tts_speaker_for_source() {
     esac
 }
 
+storage_bucket_for_source() {
+    case "$1" in
+        codex)
+            echo "codex"
+            ;;
+        *)
+            echo "claude"
+            ;;
+    esac
+}
+
 # notify_mac: fires a macOS push notification locally or on the target machine via SSH
 notify_mac() {
     local title="$1"
@@ -138,7 +149,8 @@ if [ "$MODE" = "random" ]; then
     exit 0
 fi
 
-GENERATED_DIR="$VOICE_DIR_BASE/generated"
+VOICE_STORAGE_BUCKET="$(storage_bucket_for_source "$VOICE_SOURCE")"
+GENERATED_DIR="$VOICE_DIR_BASE/generated/$VOICE_STORAGE_BUCKET"
 mkdir -p "$GENERATED_DIR"
 
 LOG_DIR="$HOME/.claude/_logs"
