@@ -25,7 +25,8 @@ VOICE_SOURCE="${VOICE_SOURCE:-claude}"
 prompt_style_for_source() {
     case "$1" in
         codex)
-            echo "Dry, terse, hacker tone. 5-8 words. 'Code shipped' energy. No fluff. Think git commit message energy."
+            # echo "Dry, terse, hacker tone. 5-8 words. 'Code shipped' energy. No fluff. Think git commit message energy."
+            echo "Snarky Gen-Z. 5-8 words. Reference what the user is working on. You can use GEN-Z language or quirky formal tone with different emotion if suitable. REDUCE THE WORD 'seriously' BEEN USED."
             ;;
         subagent)
             echo "Brief, robotic, slightly impatient. 5-8 words. Task done. Minimal personality."
@@ -65,11 +66,15 @@ tts_speaker_for_source() {
 notify_mac() {
     local title="$1"
     local message="$2"
-    local script="display notification \"${message}\" with title \"${title}\""
+    local safe_title
+    local safe_message
+    safe_title=$(printf '%s' "$title" | tr '\n' ' ' | sed 's/\\/\\\\/g; s/"/\\"/g')
+    safe_message=$(printf '%s' "$message" | tr '\n' ' ' | cut -c1-240 | sed 's/\\/\\\\/g; s/"/\\"/g')
+    local script="display notification \"${safe_message}\" with title \"${safe_title}\""
     if [ "$IS_REMOTE" = true ]; then
-        ssh "${TARGET_SSH}" "osascript -e '${script}'"
+        printf '%s\n' "$script" | ssh "${TARGET_SSH}" osascript >/dev/null 2>&1 || return 0
     else
-        osascript -e "${script}"
+        osascript -e "${script}" >/dev/null 2>&1 || return 0
     fi
 }
 
@@ -96,10 +101,11 @@ play_audio() {
     local file="$1"
     if [ "$IS_REMOTE" = true ]; then
         local remote_file="/tmp/$(basename "$file")"
-        scp -q "$file" "${TARGET_SSH}:${remote_file}"
-        ssh "${TARGET_SSH}" "afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' '${remote_file}'"
+        scp -q "$file" "${TARGET_SSH}:${remote_file}" \
+            && ssh "${TARGET_SSH}" "afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' '${remote_file}'" \
+            || return 0
     else
-        afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$file"
+        afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$file" || return 0
     fi
 }
 
@@ -114,10 +120,13 @@ play_random() {
         ssh "${TARGET_SSH}" "
             clips=(\"/Users/sean/.claude/hooks/audio/_voices/user_action/\"*.mp3)
             afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' \"\${clips[RANDOM % \${#clips[@]}]}\"
-        "
+        " || return 0
     else
         local clips=("$VOICE_DIR_BASE/user_action/"*.mp3)
-        afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "${clips[RANDOM % ${#clips[@]}]}"
+        if [ ! -f "${clips[0]}" ]; then
+            return 0
+        fi
+        afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "${clips[RANDOM % ${#clips[@]}]}" || return 0
     fi
 }
 
@@ -136,14 +145,20 @@ LOG_DIR="$HOME/.claude/_logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/voice_notify_payloads.log"
 
+log_note() {
+    local stage="$1"
+    local detail="$2"
+    printf '%s\t%s\t%s\n' "$(date -Iseconds)" "$stage" "$detail" >> "$LOG" 2>/dev/null || true
+}
+
 # Read hook payload (may be empty for Stop hook)
 PAYLOAD=$(cat)
 if [ -z "$PAYLOAD" ]; then
     PAYLOAD='{"message":"Task complete","notification_type":"stop"}'
 fi
 
-MESSAGE=$(echo "$PAYLOAD" | jq -r '.message // "Something happened"')
-NOTIFICATION_TYPE=$(echo "$PAYLOAD" | jq -r '.notification_type // "unknown"')
+MESSAGE=$(echo "$PAYLOAD" | jq -r '.message // .last_assistant_message // "Something happened"')
+NOTIFICATION_TYPE=$(echo "$PAYLOAD" | jq -r '.notification_type // .hook_event_name // "unknown"')
 TRANSCRIPT=$(echo "$PAYLOAD" | jq -r '.transcript_path // ""')
 
 # Auto-detect source refinements from payload
@@ -167,27 +182,52 @@ TTS_SPEAKER="$(tts_speaker_for_source "$VOICE_SOURCE")"
 CONTEXT=""
 if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
     CONTEXT=$(tail -30 "$TRANSCRIPT" \
-        | jq -r 'select(.type == "assistant") | [.message.content[] | select(.type == "text") | .text] | join(" ")' 2>/dev/null \
-        | tail -1 \
+        | jq -r '
+            if .type == "assistant" then
+                [.message.content[]? | select(.type == "text") | .text] | join(" ")
+            elif .type == "response_item" and .payload.type == "message" and .payload.role == "assistant" then
+                [.payload.content[]? | select(.type == "output_text" or .type == "text") | .text] | join(" ")
+            else
+                empty
+            end
+        ' 2>/dev/null \
+        | awk 'NF { last = $0 } END { print last }' \
         | cut -c1-300)
 fi
 
-PROMPT="Turn this CLI notification into a spoken alert. ${PROMPT_STYLE} No quotes, no emoji, no markdown. Just the sentence. DO NOT MENTION THE WORD 'Claude' IN THE RESPONSE
+if [ -z "$CONTEXT" ]; then
+    CONTEXT=$(echo "$PAYLOAD" | jq -r '.last_assistant_message // ""' | cut -c1-300)
+fi
 
-Type: $NOTIFICATION_TYPE
-Message: $MESSAGE
-Recent conversation: $CONTEXT"
+PROMPT="Turn this CLI notification into a spoken alert. ${PROMPT_STYLE} No quotes, no emoji, no markdown. Just the sentence. DO NOT MENTION THE WORD 'Claude' IN THE RESPONSE\n Type: $NOTIFICATION_TYPE\nMessage: $MESSAGE\nRecent conversation: $CONTEXT\n"
+
+jq -nc \
+    --arg ts "$(date -Iseconds)" \
+    --arg stage "prompt_built" \
+    --arg source "$VOICE_SOURCE" \
+    --argjson payload "$PAYLOAD" \
+    --arg context "$CONTEXT" \
+    --arg prompt "$PROMPT" \
+    '{ts: $ts, stage: $stage, source: $source, payload: $payload, context: $context, prompt: $prompt}' >> "$LOG" || true
+
+if [ "${VOICE_NOTIFY_DRY_RUN:-}" = "1" ]; then
+    exit 0
+fi
 
 # Health-check TTS server before burning an LLM call
 if ! curl -sf --max-time 5 "http://100.90.252.116:7865/health" > /dev/null 2>&1; then
-    echo "TTS health check failed" >> "$LOG"
+    log_note "tts_health_check_failed" "health endpoint unavailable"
     play_random_with_notify "tts_health_check"
     exit 0
 fi
 
+if [ "${VOICE_NOTIFY_DEBUG:-}" = "1" ]; then
+    notify_mac "DEBUG" "PROMPT: [${PROMPT}]"
+fi
+
 # Generate spoken text via Gemini; fall back to random clip if it fails
 if ! SPOKEN=$(echo "" | ollama run gemma3:4b-cloud --think=false --hidethinking "$PROMPT" 2>/dev/null) || [ -z "$SPOKEN" ]; then
-    echo "LLM generation failed or returned empty\n"STDERR/STDOUT: $SPOKEN"" >> "$LOG"
+    log_note "llm_generation_failed" "$SPOKEN"
     play_random_with_notify "llm_generation"
     exit 0
 fi
@@ -247,10 +287,10 @@ jq -nc \
     --arg context "$CONTEXT" \
     --arg spoken "$SPOKEN" \
     --argjson tts_ms "$TTS_MS" \
-    '{ts: $ts, payload: $payload, context: $context, spoken: $spoken, tts_ms: $tts_ms}' >> "$LOG"
+    '{ts: $ts, payload: $payload, context: $context, spoken: $spoken, tts_ms: $tts_ms}' >> "$LOG" || true
 
 if [ "$IS_REMOTE" = true ]; then
-    ssh "${TARGET_SSH}" "afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' '${REMOTE_FILE}'"
+    ssh "${TARGET_SSH}" "afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' '${REMOTE_FILE}'" || true
 else
-    afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$OUTFILE"
+    afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$OUTFILE" || true
 fi
