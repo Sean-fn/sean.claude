@@ -31,7 +31,7 @@ prompt_style_for_source() {
             echo "Brief, robotic, slightly impatient. 5-8 words. Task done. Minimal personality."
             ;;
         *)
-            echo "Snarky Gen-Z. 5-8 words. Reference what the user is working on. You can use GEN-Z language or quirky formal tone with different emotion if suitable."
+            echo "Snarky Gen-Z. 5-8 words. Reference what the user is working on. You can use GEN-Z language or quirky formal tone with different emotion if suitable. REDUCE THE WORD 'seriously' BEEN USED."
             ;;
     esac
 }
@@ -153,11 +153,11 @@ if [ "$VOICE_SOURCE" = "subagent" ] && echo "$SUBAGENT_TYPE" | grep -qi "codex";
 fi
 
 # Temporarily bypass transcript parsing + TTS for Codex and play a fixed clip.
-FIXED_AUDIO_FILE="$(fixed_audio_for_source "$VOICE_SOURCE" || true)"
-if [ -n "$FIXED_AUDIO_FILE" ] && [ -f "$FIXED_AUDIO_FILE" ]; then
-    play_audio "$FIXED_AUDIO_FILE"
-    exit 0
-fi
+#FIXED_AUDIO_FILE="$(fixed_audio_for_source "$VOICE_SOURCE" || true)"
+#if [ -n "$FIXED_AUDIO_FILE" ] && [ -f "$FIXED_AUDIO_FILE" ]; then
+#    play_audio "$FIXED_AUDIO_FILE"
+#    exit 0
+#fi
 
 PROMPT_STYLE="$(prompt_style_for_source "$VOICE_SOURCE")"
 TTS_INSTRUCT="$(tts_instruct_for_source "$VOICE_SOURCE")"
