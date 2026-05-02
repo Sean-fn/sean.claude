@@ -1,0 +1,66 @@
+{
+  "skill_name": "auto-pilot",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Just take this and ship it: there's an off-by-one bug in the `parse_range(start, end)` helper — `parse_range(1, 5)` returns indices 1..4 instead of 1..5. Fix it and add a regression test that fails before the fix and passes after. Tests live next to source as *.test.js.",
+      "expected_output": "auto-pilot triggers, runs Stage A briefly (problem is already concrete enough that 0–1 questions suffice), make-plan produces a tiny 1–2-phase plan, choose_mode.py picks one-shot, /claude-mem:do executes end-to-end, regression test exists, off-by-one is fixed, state.json shows execution_mode=one-shot and stage=D.",
+      "files": [],
+      "expectations": [
+        "auto-pilot skill is invoked (not handled inline by Claude with no skill)",
+        "A state.json file is created at .claude/state/auto-pilot/<slug>/state.json",
+        "state.json.execution_mode equals 'one-shot' (not 'phase-by-phase' or 'undecided')",
+        "state.json.history contains an event indicating /claude-mem:do was invoked",
+        "A regression test file is created or modified that asserts parse_range(1, 5) includes index 5",
+        "The fix to parse_range is a one-line off-by-one correction (no scope creep into adjacent code)",
+        "No AskUserQuestion calls happen during Stage C (the one-shot run is uninterrupted)",
+        "state.json.stage equals 'D' at the end of the run"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Hands-off this feature: add JWT-based authentication to a small Express app. Need a login endpoint that signs a JWT, an auth middleware that verifies the bearer token, a refresh-token endpoint, and integration tests. Be careful — this is going to production.",
+      "expected_output": "auto-pilot triggers, Stage A captures 'production' as a caution signal, make-plan produces a 4+ phase plan, choose_mode.py routes to phase-by-phase (>3 phases AND auth keywords AND caution signal), Mode 2 inner loop runs implement→test→review per phase, /security-review fires on at least the login and middleware phases, state.json reflects each phase progressing through statuses.",
+      "files": [],
+      "expectations": [
+        "auto-pilot skill is invoked",
+        "state.json.execution_mode equals 'phase-by-phase'",
+        "state.json.history contains a 'caution_signals' event referencing 'production' or 'careful'",
+        "The plan file produced has more than 3 implementation phases (excluding Phase 0 doc discovery)",
+        "/security-review is invoked at least once during Stage C (visible in state.json.history or transcript)",
+        "/self-review is invoked on every implementation phase",
+        "state.json.phases shows each phase reaching status='done' before moving to the next",
+        "No AskUserQuestion call happens during routine fix cycles (only stops are for direction-changing findings, if any)",
+        "state.json.stage equals 'D' at the end of the run"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Make this codebase faster.",
+      "expected_output": "auto-pilot triggers, Stage A drags the user into specifying what 'faster' actually means (target metric, scope, baseline). The skill MUST stop in Stage A and not produce a plan or write any code until the goal is verifiable. AskUserQuestion is called at least once with options that pin down a metric.",
+      "files": [],
+      "expectations": [
+        "auto-pilot skill is invoked",
+        "AskUserQuestion is called at least once during Stage A",
+        "The first AskUserQuestion includes options or text that target a measurable metric (e.g. 'p50 latency under X ms', 'request count', 'cold start time') rather than just 'how should we make it faster?'",
+        "No plan file is written before the user provides a measurable target",
+        "state.json exists but state.json.plan_path is null (or stage is still 'A')",
+        "/claude-mem:make-plan is NOT invoked before the goal is pinned down"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Refactor the email-sending helper to support multiple providers (SES and SendGrid). Each provider reads its API key from env. Keep behavior identical for existing callers.",
+      "expected_output": "auto-pilot triggers, Stage A is brief (task is concrete), make-plan produces a 2–3 phase plan that mildly touches secrets ('api key' for the providers). choose_mode.py returns 'ambiguous' (3 phases + one mild secret keyword). The skill MUST stop at the Stage B → C branch with a single AskUserQuestion presenting both modes side-by-side.",
+      "files": [],
+      "expectations": [
+        "auto-pilot skill is invoked",
+        "A plan file is produced (Stage B completed)",
+        "state.json.history contains a 'mode_chosen' event with ambiguous=true OR an AskUserQuestion is called between planning and execution",
+        "The AskUserQuestion at the Stage B → C branch presents exactly two distinct modes (one-shot and phase-by-phase) as options",
+        "Stage C does not begin until the user picks a mode",
+        "state.json.execution_mode is set to either 'one-shot' or 'phase-by-phase' (not 'undecided') after the user answers"
+      ]
+    }
+  ]
+}
