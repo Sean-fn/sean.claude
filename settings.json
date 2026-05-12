@@ -2,11 +2,13 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "cleanupPeriodDays": 90,
   "env": {
-    "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "1"
+    "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "1",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
+      "Read",
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(head:*)",
@@ -27,9 +29,34 @@
       "Bash(jira issue list:*)",
       "Bash(gh pr list:*)",
       "Bash(gh pr view:*)",
-      "Bash(hf paper:*)"
+      "Bash(hf paper:*)",
+      "Bash(python3 -c:*)",
+      "mcp__beeper__search_chats",
+      "mcp__beeper__list_messages",
+      "mcp__beeper__get_accounts",
+      "mcp__beeper__search",
+      "mcp__beeper__get_chat",
+      "mcp__beeper__archive_chat",
+      "mcp__beeper__set_chat_reminder",
+      "mcp__beeper__search_messages",
+      "mcp__beeper__search_docs",
+      "mcp__context7",
+      "mcp__notebooklm-mcp",
+      "mcp__local-line-desktop-mcp__get_line_chatroom_history_default",
+      "mcp__local-line-desktop-mcp__get_line_chatroom_history_long",
+      "mcp__local-line-desktop-mcp__get_line_chatroom_history_short",
+      "mcp__local-line-desktop-mcp__send_message_manual",
+      "mcp__chrome-devtools-mcp:chrome-devtools"
     ],
-    "deny": [],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force *)",
+      "Bash(curl * | sh)",
+      "Bash(DROP TABLE *)"
+    ],
+    "ask": [
+      "mcp__line"
+    ],
     "defaultMode": "plan"
   },
   "hooks": {
