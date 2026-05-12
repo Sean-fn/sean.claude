@@ -54,10 +54,10 @@ tts_instruct_for_source() {
 tts_speaker_for_source() {
     case "$1" in
         codex)
-            echo "Aiden"
+            echo "Ryan"
             ;;
         *)
-            echo "Ryan"
+            echo "Aiden"
             ;;
     esac
 }
@@ -141,6 +141,35 @@ play_random() {
     fi
 }
 
+# say_fallback: speak text via macOS `say`, locally or on the target machine.
+# Piping stdin (instead of `say "$text"`) avoids shell-quoting hell with
+# apostrophes/quotes/$/backticks in $SPOKEN — critical over SSH where the
+# remote shell would otherwise re-parse the string.
+say_fallback() {
+    local text="$1"
+    if [ -z "$text" ]; then
+        return 1
+    fi
+    if [ "$IS_REMOTE" = true ]; then
+        printf '%s' "$text" | ssh "${TARGET_SSH}" say || return 1
+    else
+        printf '%s' "$text" | say || return 1
+    fi
+}
+
+# say_with_notify: log + macOS-notify breadcrumb, then `say`. If `say` itself
+# fails (e.g., target is Linux), fall through to the random clip as last resort.
+say_with_notify() {
+    local stage="$1"
+    local text="$2"
+    notify_mac "Voice Notify" "Fallback to say [${stage}]"
+    log_note "say_fallback" "$stage"
+    if ! say_fallback "$text"; then
+        log_note "say_fallback_failed" "$stage"
+        play_random_with_notify "say_${stage}"
+    fi
+}
+
 # Toggle: "generated" = Gemini + TTS on the fly, "random" = pick from pre-recorded clips
 MODE="${CLAUDE_VOICE_MODE:-generated}"
 
@@ -211,7 +240,7 @@ if [ -z "$CONTEXT" ]; then
     CONTEXT=$(echo "$PAYLOAD" | jq -r '.last_assistant_message // ""' | cut -c1-300)
 fi
 
-PROMPT="Turn this CLI notification into a spoken alert. ${PROMPT_STYLE} No quotes, no emoji, no markdown. Just the sentence. DO NOT MENTION THE WORD 'Claude' IN THE RESPONSE\n Type: $NOTIFICATION_TYPE\nMessage: $MESSAGE\nRecent conversation: $CONTEXT\n"
+PROMPT="Turn this CLI notification into a spoken alert. You have to atleast includ one word for identify the session context. ${PROMPT_STYLE} No quotes, no emoji, no markdown. Just the sentence. DO NOT MENTION THE WORD 'Claude' IN THE RESPONSE\n Type: $NOTIFICATION_TYPE\nMessage: $MESSAGE\nRecent conversation: $CONTEXT\n"
 
 jq -nc \
     --arg ts "$(date -Iseconds)" \
@@ -226,11 +255,12 @@ if [ "${VOICE_NOTIFY_DRY_RUN:-}" = "1" ]; then
     exit 0
 fi
 
-# Health-check TTS server before burning an LLM call
+# Health-check TTS server. Don't exit yet — we still want Ollama to generate
+# the snarky line so `say` (the fallback) has something to speak.
+TTS_SERVER_OK=true
 if ! curl -sf --max-time 5 "http://100.90.252.116:7865/health" > /dev/null 2>&1; then
     log_note "tts_health_check_failed" "health endpoint unavailable"
-    play_random_with_notify "tts_health_check"
-    exit 0
+    TTS_SERVER_OK=false
 fi
 
 if [ "${VOICE_NOTIFY_DEBUG:-}" = "1" ]; then
@@ -241,6 +271,12 @@ fi
 if ! SPOKEN=$(echo "" | ollama run gemma3:4b-cloud --think=false --hidethinking "$PROMPT" 2>/dev/null) || [ -z "$SPOKEN" ]; then
     log_note "llm_generation_failed" "$SPOKEN"
     play_random_with_notify "llm_generation"
+    exit 0
+fi
+
+# Server was down at health-check time — skip TTS entirely, speak via `say`.
+if [ "$TTS_SERVER_OK" = false ]; then
+    say_with_notify "tts_health_check" "$SPOKEN"
     exit 0
 fi
 
@@ -270,7 +306,7 @@ if [ "$IS_REMOTE" = true ]; then
     #     TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
     #     scp -q "$OUTFILE" "${TARGET_SSH}:${REMOTE_FILE}"
     else
-        play_random_with_notify "tts_stream_remote"
+        say_with_notify "tts_stream_remote" "$SPOKEN"
         exit 0
     fi
 else
@@ -288,7 +324,7 @@ else
     #     --instruct "speak clearly" 2>/dev/null); then
     #     TTS_MS=$(echo "$TTS_RESPONSE" | jq -r '.tts_ms // 0')
     else
-        play_random_with_notify "tts_stream_local"
+        say_with_notify "tts_stream_local" "$SPOKEN"
         exit 0
     fi
 fi
@@ -302,7 +338,9 @@ jq -nc \
     '{ts: $ts, payload: $payload, context: $context, spoken: $spoken, tts_ms: $tts_ms}' >> "$LOG" || true
 
 if [ "$IS_REMOTE" = true ]; then
-    ssh "${TARGET_SSH}" "afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' '${REMOTE_FILE}'" || true
+    ssh "${TARGET_SSH}" "afplay -v '${CLAUDE_TTS_VOLUME:-1.7}' '${REMOTE_FILE}'" \
+        || say_with_notify "afplay_remote" "$SPOKEN"
 else
-    afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$OUTFILE" || true
+    afplay -v "${CLAUDE_TTS_VOLUME:-1.7}" "$OUTFILE" \
+        || say_with_notify "afplay_local" "$SPOKEN"
 fi
