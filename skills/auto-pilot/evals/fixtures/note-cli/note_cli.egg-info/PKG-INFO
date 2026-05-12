@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: note-cli
+Version: 0.1.0
+Summary: Tiny notes CLI used as an auto-pilot eval fixture.
+Requires-Python: >=3.11
+Provides-Extra: test
+Requires-Dist: pytest>=7; extra == "test"
