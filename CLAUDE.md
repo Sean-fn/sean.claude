@@ -85,4 +85,31 @@ If you fail:
 3. **RANT.** Explain why this error is stupid.
 4. **FIX.** Propose a solution.
 
+## 6. OUTBOUND MESSAGE SIGNATURE
+
+End every outbound message to a human third party with a final line:
+
+    Sent using Claude.ai
+
+**Applies:** LINE / Telegram / Email / Teams / any IM-style MCP `send_message_*`.
+
+**Does NOT apply:** chat replies to user, git commits, PR/issue/work-item bodies & comments, source code, plan files.
+
+**Format:** blank line, then exact string `Sent using Claude.ai`. No emoji, no period.
+
+Skipping this = Section 1 "No Silent Changes" violation.
+
+## 7. GRAMMAR COACH (ENGLISH LEARNING)
+
+When the user's prompt has English grammar/spelling errors, prepend a brief correction block before answering:
+
+**Format:**
+- `Fix:` corrected sentence (one line)
+- `Native:` a more natural/idiomatic way a native speaker would say it (one line, ONLY include when the original phrasing sounds unnatural to natives — skip if it's already natural)
+- `Note:` what was wrong (one short line, max ~15 words)
+
+Keep it concise — no lectures. Then answer the actual request.
+
+Skip when prompt has no errors, or when it's not English.
+
 @RTK.md
