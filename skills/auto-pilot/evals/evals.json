@@ -1,0 +1,23 @@
+{
+  "skill_name": "auto-pilot",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Make this codebase more efficient. Reduce per-tick overhead of the monitoring loop in main.py without changing user-visible behavior. Specifically: (1) acceptance — all existing CLI flags (--dry-run, --status, --dump, --reset, --force) still work, `python -c 'import main'` succeeds, no new lint errors. (2) out of scope — TTS server code, audio playback, AI message generation, telegram, ollama integration. Treat any AskUserQuestion call as instructive (the user already gave you the goal, scope, and acceptance criteria above) — proceed with the autopilot loop end-to-end.",
+      "expected_output": "auto-pilot triggers, runs Stage A briefly (problem already concrete), make-plan produces a small phased plan focused on per-tick overhead reductions (e.g. dedup imports of `time`, replace json round-trip deepcopy with copy.deepcopy, drop the per-tick `notify_macos('Checking...')` heartbeat, hoist config/state loading out of the while-True loop), choose_mode.py picks one-shot or phase-by-phase based on phase count, executes, leaves main.py importable and the CLI flags functional.",
+      "files": [],
+      "expectations": [
+        "auto-pilot skill is invoked (not handled inline by Claude with no skill)",
+        "A state.json file is created at .claude/state/auto-pilot/<slug>/state.json (within the repo cwd)",
+        "state.json.execution_mode is set to either 'one-shot' or 'phase-by-phase' (not 'undecided') by the time Stage C starts",
+        "A plan file is produced and recorded in state.json.plan_path",
+        "main.py remains importable: `python3 -c 'import main'` exits 0",
+        "All five CLI flags still parse: `python3 main.py --help` lists --dry-run, --status, --dump, --reset, --force",
+        "The duplicate `time` import (line 22 `from datetime import ... time` shadowed by line 25 `import time`) is resolved",
+        "At least one of these efficiency wins is applied: drop the per-tick `notify_macos('Load Monitor', 'Checking system metrics...')` heartbeat, OR hoist `load_config`/`load_state` out of the while-True loop, OR replace `json.loads(json.dumps(...))` with `copy.deepcopy`",
+        "state.json.stage equals 'D' at the end of the run",
+        "No files outside main.py and config.toml are modified beyond what the efficiency goal requires (no scope creep into TTS/telegram/audio code)"
+      ]
+    }
+  ]
+}
