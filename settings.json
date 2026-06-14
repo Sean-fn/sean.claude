@@ -3,7 +3,15 @@
   "cleanupPeriodDays": 90,
   "env": {
     "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "1",
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "ANTHROPIC_BASE_URL": "http://localhost:4141",
+    "ANTHROPIC_AUTH_TOKEN": "dummy",
+    "ANTHROPIC_MODEL": "claude-opus-4.8",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-4.8",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-opus-4.8",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-opus-4.8",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   },
   "includeCoAuthoredBy": false,
   "permissions": {
@@ -46,13 +54,66 @@
       "mcp__local-line-desktop-mcp__get_line_chatroom_history_long",
       "mcp__local-line-desktop-mcp__get_line_chatroom_history_short",
       "mcp__local-line-desktop-mcp__send_message_manual",
-      "mcp__chrome-devtools-mcp:chrome-devtools"
+      "mcp__chrome-devtools-mcp:chrome-devtools",
+      "mcp__ado__core_get_identity_ids",
+      "mcp__ado__core_list_project_teams",
+      "mcp__ado__core_list_projects",
+      "mcp__ado__pipelines_download_artifact",
+      "mcp__ado__pipelines_get_build_changes",
+      "mcp__ado__pipelines_get_build_definition_revisions",
+      "mcp__ado__pipelines_get_build_definitions",
+      "mcp__ado__pipelines_get_build_log",
+      "mcp__ado__pipelines_get_build_log_by_id",
+      "mcp__ado__pipelines_get_build_status",
+      "mcp__ado__pipelines_get_builds",
+      "mcp__ado__pipelines_get_run",
+      "mcp__ado__pipelines_list_artifacts",
+      "mcp__ado__pipelines_list_runs",
+      "mcp__ado__repo_get_branch_by_name",
+      "mcp__ado__repo_get_file_content",
+      "mcp__ado__repo_get_pull_request_by_id",
+      "mcp__ado__repo_get_pull_request_changes",
+      "mcp__ado__repo_get_repo_by_name_or_id",
+      "mcp__ado__repo_list_branches_by_repo",
+      "mcp__ado__repo_list_directory",
+      "mcp__ado__repo_list_my_branches_by_repo",
+      "mcp__ado__repo_list_pull_request_thread_comments",
+      "mcp__ado__repo_list_pull_request_threads",
+      "mcp__ado__repo_list_pull_requests_by_commits",
+      "mcp__ado__repo_list_pull_requests_by_repo_or_project",
+      "mcp__ado__repo_list_repos_by_project",
+      "mcp__ado__repo_search_commits",
+      "mcp__ado__wit_get_query",
+      "mcp__ado__wit_get_query_results_by_id",
+      "mcp__ado__wit_get_work_item",
+      "mcp__ado__wit_get_work_item_attachment",
+      "mcp__ado__wit_get_work_item_type",
+      "mcp__ado__wit_get_work_items_batch_by_ids",
+      "mcp__ado__wit_get_work_items_for_iteration",
+      "mcp__ado__wit_list_backlog_work_items",
+      "mcp__ado__wit_list_backlogs",
+      "mcp__ado__wit_list_work_item_comments",
+      "mcp__ado__wit_list_work_item_revisions",
+      "mcp__ado__wit_my_work_items",
+      "mcp__ado__wit_query_by_wiql"
     ],
     "deny": [
       "Bash(rm -rf *)",
       "Bash(git push --force *)",
       "Bash(curl * | sh)",
-      "Bash(DROP TABLE *)"
+      "Bash(DROP TABLE *)",
+      "mcp__ado__pipelines_create_pipeline",
+      "mcp__ado__pipelines_update_build_stage",
+      "mcp__ado__repo_update_pull_request_reviewers",
+      "mcp__ado__repo_update_pull_request_thread",
+      "mcp__ado__wit_add_artifact_link",
+      "mcp__ado__wit_update_work_item_comment",
+      "mcp__ado__wit_update_work_items_batch",
+      "mcp__ado__wit_work_item_unlink",
+      "mcp__ado__wit_work_items_link",
+      "mcp__ado__work_assign_iterations",
+      "mcp__ado__work_create_iterations",
+      "mcp__ado__work_update_team_capacity"
     ],
     "ask": [
       "mcp__line"
@@ -88,16 +149,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -c \"import json, sys; data=json.load(sys.stdin); path=data.get('tool_input',{}).get('file_path',''); sys.exit(2 if any(p in path for p in ['.env', '.git/', 'secrets.env']) else 0)\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/sean/.claude/hooks/rtk-rewrite.sh"
+            "command": "python3 -c \"import json, sys; data=json.load(sys.stdin); path=data.get('tool_input',{}).get('file_path',''); sys.exit(2 if any(p in path for p in ['.env', '.git/', 'secrets.env']) else 0)\""
           }
         ]
       }
@@ -138,7 +190,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "VOICE_SOURCE=subagent bash ~/.claude/hooks/audio/voice_notify.sh"
+            "command": "echo ''"
           }
         ]
       }
@@ -156,17 +208,59 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash /Users/sean/.claude/hooks/statusline/usage_statusline.sh"
+    "command": "bash ~/.claude/hooks/statusline/usage_statusline.sh"
   },
   "enabledPlugins": {
-    "gf-jira@tool-cc-forge": true,
-    "gf-slack@tool-cc-forge": true
+    "telegram@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true,
+    "codex@openai-codex": true,
+    "gf-support-emails@local-tool-cc-forge": true,
+    "claude-mem@thedotmack": true,
+    "epso-ado-repos@ai-tool": true,
+    "task-swarm@sean-marketplace": true,
+    "sean-skill-creator@sean-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "tool-cc-forge": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/sean/.claude/plugins/marketplaces/local-tool-cc-forge"
+      }
+    },
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
+    },
+    "thedotmack": {
+      "source": {
+        "source": "github",
+        "repo": "thedotmack/claude-mem"
+      }
+    },
+    "ai-tool": {
+      "source": {
+        "source": "github",
+        "repo": "BeyondsoftTaiwan/ai-tool"
+      }
+    },
+    "sean-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "Sean-fn/sean-marketplace"
+      }
+    }
   },
   "outputStyle": "Explanatory",
+  "language": "\u53f0\u7063\u4e2d\u6587",
   "alwaysThinkingEnabled": true,
-  "voiceEnabled": true,
+  "effortLevel": "max",
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
+  "voiceEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754106537142
-  }
+  },
+  "model": "claude-opus-4.8"
 }

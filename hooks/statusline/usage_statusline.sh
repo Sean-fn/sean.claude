@@ -108,16 +108,20 @@ if [[ $R5 -ge 0 && $E5 -ge 0 ]]; then
   make_bar "$R5" 6; BAR5="$BAR"
   color_for "$R5" "$E5"
   PART5="5h ${BAR5} ${CLR}${R5}%${X}${D}/${E5}%${X}"
+  HAVE_5=1
 else
   PART5="5h --"
+  HAVE_5=0
 fi
 
 if [[ $R7 -ge 0 && $E7 -ge 0 ]]; then
   make_bar "$R7" 6; BAR7="$BAR"
   color_for "$R7" "$E7"
   PART7="7d ${BAR7} ${CLR}${R7}%${X}${D}/${E7}%${X}"
+  HAVE_7=1
 else
   PART7="7d --"
+  HAVE_7=0
 fi
 
 LINE2="${PART5}  ${PART7}"
@@ -143,6 +147,8 @@ LINE4+=" ${D}·${X} ${Y}${COST_RATE_FMT}${X}"
 
 # --- Output with box-drawing (echo -e per line, per docs) ---
 echo -e "┌ ${LINE1}"
-echo -e "├ ${LINE2}"
+if [[ $HAVE_5 -eq 1 || $HAVE_7 -eq 1 ]]; then
+  echo -e "├ ${LINE2}"
+fi
 echo -e "├ ${LINE3}"
 echo -e "└ ${LINE4}"
