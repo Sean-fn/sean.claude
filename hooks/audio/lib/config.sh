@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# config.sh — 平台偵測 + 設定讀取。設計為可 source。
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AUDIO_DIR="$(cd "$LIB_DIR/.." && pwd)"
+VOICE_CONFIG_FILE="${VOICE_CONFIG_FILE:-$AUDIO_DIR/notify.config.json}"
+
+detect_platform() {
+    [ -n "${VOICE_PLATFORM_OVERRIDE:-}" ] && { echo "$VOICE_PLATFORM_OVERRIDE"; return; }
+    local uname_s="${VOICE_UNAME_OVERRIDE:-$(uname -s)}"
+    local procfile="${VOICE_PROC_VERSION:-/proc/version}"
+    case "$uname_s" in
+        Darwin) echo mac ;;
+        Linux)
+            if [ -n "${WSL_DISTRO_NAME:-}" ]; then echo wsl
+            elif grep -qi microsoft "$procfile" 2>/dev/null; then echo wsl
+            else echo linux; fi ;;
+        MINGW*|MSYS*|CYGWIN*) echo windows ;;
+        *) echo linux ;;
+    esac
+}
+
+cfg() {
+    local filter="$1" default="${2:-}" val
+    val=$(jq -r "$filter // empty" "$VOICE_CONFIG_FILE" 2>/dev/null)
+    [ -n "$val" ] && printf '%s' "$val" || printf '%s' "$default"
+}
+
+platform_channels() {
+    if [ -n "${VOICE_CHANNELS:-}" ]; then printf '%s' "${VOICE_CHANNELS//,/ }"; return; fi
+    jq -r ".channels.\"${VOICE_PLATFORM}\" // [] | join(\" \")" "$VOICE_CONFIG_FILE" 2>/dev/null
+}
+
+load_platform() { export VOICE_PLATFORM="${VOICE_PLATFORM:-$(detect_platform)}"; }
+
+# dual source/CLI:被當成 CLI 直接執行時支援 --print-platform
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    [ "${1:-}" = "--print-platform" ] && detect_platform
+fi

@@ -257,5 +257,8 @@
   "voiceEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754106537142
+  },
+  "worktree": {
+    "bgIsolation": "none"
   }
 }
