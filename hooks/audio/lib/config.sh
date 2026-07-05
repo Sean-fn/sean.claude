@@ -19,6 +19,19 @@ detect_platform() {
     esac
 }
 
+cfg() {
+    local filter="$1" default="${2:-}" val
+    val=$(jq -r "$filter // empty" "$VOICE_CONFIG_FILE" 2>/dev/null)
+    [ -n "$val" ] && printf '%s' "$val" || printf '%s' "$default"
+}
+
+platform_channels() {
+    if [ -n "${VOICE_CHANNELS:-}" ]; then printf '%s' "${VOICE_CHANNELS//,/ }"; return; fi
+    jq -r ".channels.\"${VOICE_PLATFORM}\" // [] | join(\" \")" "$VOICE_CONFIG_FILE" 2>/dev/null
+}
+
+load_platform() { export VOICE_PLATFORM="${VOICE_PLATFORM:-$(detect_platform)}"; }
+
 # dual source/CLI:被當成 CLI 直接執行時支援 --print-platform
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     [ "${1:-}" = "--print-platform" ] && detect_platform
