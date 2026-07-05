@@ -15,7 +15,8 @@ say_speak() {
             local safe="${text//\'/\'\'}"
             if [ -n "${VOICE_SAY_DRYRUN:-}" ]; then echo "System.Speech: $safe"; return; fi
             # SpeakAsync + 背景化:不阻塞 hook(否則 Stop hook 會卡到唸完,實測~6s)
-            powershell.exe -NoProfile -Command "Add-Type -AssemblyName System.Speech; \$s=New-Object System.Speech.Synthesis.SpeechSynthesizer; \$s.SpeakAsync('${safe}') | Out-Null; Start-Sleep -Seconds 8" >/dev/null 2>&1 &
+            # Sleep 15:保活到唸完;LLM 常超出 5-8 字上限,8s 會截斷長句
+            powershell.exe -NoProfile -Command "Add-Type -AssemblyName System.Speech; \$s=New-Object System.Speech.Synthesis.SpeechSynthesizer; \$s.SpeakAsync('${safe}') | Out-Null; Start-Sleep -Seconds 15" >/dev/null 2>&1 &
             ;;
         *) return 1 ;;
     esac

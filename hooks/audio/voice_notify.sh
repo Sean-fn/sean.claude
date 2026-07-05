@@ -19,12 +19,15 @@ dispatch_channel() {
         say)      printf '%s' "$text" | bash "$AUDIO_DIR/lib/channels/say.sh" || log_note "channel_fail" "say" ;;
         tts)      printf '%s' "$text" | bash "$AUDIO_DIR/lib/channels/tts.sh" || { log_note "channel_fail" "tts"; printf '%s' "$text" | bash "$AUDIO_DIR/lib/channels/say.sh" >/dev/null 2>&1 || true; } ;;
         telegram) printf '%s' "$text" | bash "$AUDIO_DIR/lib/channels/telegram.sh" || log_note "channel_fail" "telegram" ;;
-        fixed)    bash "$AUDIO_DIR/lib/channels/fixed_audio.sh" || log_note "channel_fail" "fixed" ;;
+        fixed|fixed_audio) bash "$AUDIO_DIR/lib/channels/fixed_audio.sh" || log_note "channel_fail" "fixed_audio" ;;
+        *)        log_note "channel_unknown" "$ch" ;;
     esac
 }
 
 broadcast() {
     local text="$1" ch
+    # 把 config 的 volume 接到 player 讀的 CLAUDE_TTS_VOLUME(未被 env 覆蓋時)
+    export CLAUDE_TTS_VOLUME="${CLAUDE_TTS_VOLUME:-$(cfg '.volume' 0.85)}"
     for ch in $(platform_channels); do dispatch_channel "$ch" "$text"; done
 }
 
