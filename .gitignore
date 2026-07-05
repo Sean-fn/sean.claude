@@ -57,3 +57,6 @@ bot.pid
 jobs/
 deamon/
 teams/
+
+# voice_notify secrets
+hooks/audio/channels/telegram/notify.env
