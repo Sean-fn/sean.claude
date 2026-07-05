@@ -1,0 +1,4 @@
+{
+  "provider": "echotest",
+  "providers": { "echotest": { "cmd": ["echo", "GOT:", "{PROMPT}"] } }
+}

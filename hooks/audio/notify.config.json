@@ -1,7 +1,7 @@
 {
   "provider": "copilot",
   "providers": {
-    "copilot": { "cmd": ["copilot", "-m", "gpt-5.4-mini", "-p", "{PROMPT}"] },
+    "copilot": { "cmd": ["copilot", "--model", "gpt-5.4-mini", "--silent", "--no-color", "-p", "{PROMPT}"] },
     "gemini":  { "cmd": ["gemini", "-m", "gemini-2.5-flash-lite", "-p", "{PROMPT}"] },
     "ollama":  { "cmd": ["ollama", "run", "gemma3:4b-cloud", "{PROMPT}"] }
   },
