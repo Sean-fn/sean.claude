@@ -86,21 +86,28 @@
 | `windows` | powershell MediaPlayer | System.Speech | uname 含 MINGW/MSYS/CYGWIN |
 | `linux` | ffplay / mpg123 | **無 → say 略過** | uname = Linux 且非 WSL |
 
-### 5.2 偵測實作(env-var 優先,免子行程)
+### 5.2 偵測實作(env-var 快路 + `/proc/version` 兜底)
 
 實測數據(這台):
-- `grep /proc/version` 版:**10.6 ms/次**
-- 讀 `$WSL_DISTRO_NAME` env var 版:**0.017 ms/次**(快 600 倍)
+- 讀 `$WSL_DISTRO_NAME` env var:**0.017 ms/次**(快路)
+- `grep /proc/version`:**10.6 ms/次**(兜底,慢但永遠正確)
 
-因此偵測邏輯優先讀 env var:
+**關鍵**:`$WSL_DISTRO_NAME` 由 WSL init 自動注入 PID 1、子行程繼承,**不來自任何 shell profile**(已 grep 確認 `.bashrc`/`.profile`/`/etc/environment` 皆無)。因此 Claude hook(子行程)繼承得到,正常情境可靠。
+
+**但它在清空環境下會消失**——`cron`、`sudo`(無 `-E`)、`env -i` 都會讓 env var 為空,導致 WSL 被**誤判為純 linux → say 通道被略過 → 系統語音沉默退化**(最難查的那種 bug)。`/proc/version` 是 kernel 介面而非環境變數,任何情境都讀得到(實測 `env -i` 下仍含 microsoft)。
+
+因此偵測必須是**快路 + 兜底兩層**,不是二選一:
 
 ```
 detect_platform():
-  [ uname = Darwin ]          → mac
-  [ $WSL_DISTRO_NAME 非空 ]    → wsl        # 免 grep /proc/version
-  [ uname = Linux ]           → linux
-  [ uname 含 MINGW/MSYS ]      → windows
+  [ uname = Darwin ]                              → mac
+  [ $WSL_DISTRO_NAME 非空 ]                        → wsl      # 快路 0.017ms,涵蓋常態
+  [ uname = Linux 且 /proc/version 含 microsoft ]  → wsl      # 兜底,env 被清空時救場
+  [ uname = Linux ]                               → linux
+  [ uname 含 MINGW/MSYS/CYGWIN ]                   → windows
 ```
+
+env var 命中即走人;僅當它意外空掉才付 10ms 讀 `/proc/version`。快而不脆。
 
 **單次 export**:`config.sh` 開頭 `export VOICE_PLATFORM=$(detect_platform)` 一次,後續 player/say 全讀這個變數,不重跑。一次 hook 觸發只偵測一次。
 
@@ -118,7 +125,7 @@ detect_platform():
 {
   "provider": "copilot",
   "providers": {
-    "copilot": { "cmd": ["copilot", "-p", "{PROMPT}"] },
+    "copilot": { "cmd": ["copilot", "-m", "gpt-5.4-mini", "-p", "{PROMPT}"] },
     "gemini":  { "cmd": ["gemini", "-m", "gemini-2.5-flash-lite", "-p", "{PROMPT}"] },
     "ollama":  { "cmd": ["ollama", "run", "gemma3:4b-cloud", "{PROMPT}"] }
   },
@@ -157,13 +164,15 @@ VOICE_PROVIDER=gemini VOICE_CHANNELS=say bash voice_notify.sh
 
 | Provider | 呼叫 |
 |----------|------|
-| Copilot | `copilot -p "$PROMPT"` |
+| Copilot | `copilot -m gpt-5.4-mini -p "$PROMPT"` |
 | Gemini | `gemini -m ... -p "$PROMPT"` |
 | Ollama | `ollama run <model> "$PROMPT"` |
 
 `providers.sh` 讀 `providers.<name>.cmd` 陣列,把 `{PROMPT}` 佔位符換成實際 prompt 再執行。新增 provider = config 加一個 entry,**不改程式**。
 
-**預設 `copilot`**:實測這台 `copilot` ✓ 有裝、`gemini`/`ollama` ✗ 沒裝。
+**預設 `copilot`**:實測這台 `copilot` ✓ 有裝、`gemini`/`ollama` ✗ 沒裝。`--model`/`-p` 旗標實測有效。
+
+**實作期驗證點**:`gpt-5.4-mini` 這個 model 名 CLI 不會預檢(`--help` 範例只列到 `gpt-5.4`)。首次跑實際腳本時須確認此 model 名有效 —— 若無效,copilot 會靜默失敗、每次退隨機音檔(即現行 ollama 坑的翻版)。驗證方式:`VOICE_PROVIDER=copilot bash lib/providers.sh "hi in 5 words"` 應吐出一句文字而非錯誤。
 
 ---
 
