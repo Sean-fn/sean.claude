@@ -54,3 +54,6 @@ access.json
 bot.pid
 *.out
 *.bak
+jobs/
+deamon/
+teams/

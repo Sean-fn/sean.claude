@@ -19,9 +19,9 @@ VL_LAYOUT="fixed" # fixed: one line per VL_SEGMENTS* var
 # auto:  single line, wraps when the window is narrow
 VL_MAX_LINES=3 # auto only — wrap into at most this many lines
 # VL_SEGMENTS="dir git model ctx limit5h limit7d cost clock"
-VL_SEGMENTS="dir git model"
-VL_SEGMENTS2="ctx cost clock"             # fixed only — optional second line
-VL_SEGMENTS3="lines style duration stash" # fixed only — optional third line
+VL_SEGMENTS="dir git"
+VL_SEGMENTS2="ctx cost"                   # fixed only — optional second line
+VL_SEGMENTS3="lines duration stash clock" # fixed only — optional third line
 VL_BAR_WIDTH=5
 VL_BAR_FILL="▰"
 VL_BAR_EMPTY="▱"
@@ -31,7 +31,8 @@ VL_PATH_DEPTH=4 # collapse paths deeper than this
 VL_COST_DECIMALS=2
 VL_WARN_PCT=50 # percentage thresholds for bar colors
 VL_HOT_PCT=75
-VL_ASCII=0 # 1 = no Nerd Font glyphs (plain colored blocks)
+VL_CTX_MAX=1000000   # token ceiling the ctx bar frames against; 0 = auto-detect from JSON
+VL_ASCII=0            # 1 = no Nerd Font glyphs (plain colored blocks)
 
 # Powerline glyphs (overridable; cleared when VL_ASCII=1)
 VL_CAP_L=$(printf '\xee\x82\xb6') # U+E0B6 left rounded cap
@@ -81,13 +82,14 @@ fi
 # ── Parse JSON (single jq call) ──────────────────────────────────────────────
 # Fields are joined with \x1f (unit separator): unlike tab, a non-whitespace
 # IFS preserves empty fields instead of collapsing consecutive delimiters.
-IFS=$'\037' read -r cwd model ctx_pct tok_in tok_out tok_cr tok_cw \
+IFS=$'\037' read -r cwd model ctx_pct ctx_size tok_in tok_out tok_cr tok_cw \
   fh_pct fh_rst wd_pct wd_rst cost \
   lines_add lines_del out_style dur_ms <<JSON
 $(printf '%s' "$input" | jq -r '[
   (.workspace.current_dir // .cwd // ""),
   (.model.display_name // ""),
   (.context_window.used_percentage // "" | tostring),
+  (.context_window.context_window_size // 0),
   (.context_window.total_input_tokens // 0),
   (.context_window.total_output_tokens // 0),
   (.context_window.current_usage.cache_read_input_tokens // 0),
@@ -297,8 +299,17 @@ seg_model() {
 
 seg_ctx() {
   [ -n "$ctx_pct" ] || return 0
-  local ci bar cn
-  ci=$(printf '%.0f' "$ctx_pct" 2>/dev/null) || ci=0
+  local ci bar cn window
+  # Frame % against VL_CTX_MAX (default 1M); 0 = use the per-session window the
+  # JSON reports (context_window_size: 200k or 1M). total_input_tokens is already
+  # the input-only sum Claude Code's own used_percentage is based on.
+  window="${VL_CTX_MAX:-0}"
+  [ "$window" -gt 0 ] || window="${ctx_size:-0}"
+  if [ "$window" -gt 0 ] && [ "${tok_in:-0}" -gt 0 ]; then
+    ci=$((tok_in * 100 / window))
+  else
+    ci=$(printf '%.0f' "$ctx_pct" 2>/dev/null) || ci=0
+  fi
   bar=$(make_bar "$ci")
   cn=$(pct_fg "$ci")
   push "$VL_BG_CTX" "$(fg $cn) ⬡ ${bar} ${ci}% $(fg $VL_FG_DIM)↑$(fmt_tok $tok_in) ↓$(fmt_tok $tok_out) cr:$(fmt_tok $tok_cr) cw:$(fmt_tok $tok_cw) "
