@@ -15,4 +15,5 @@ rm -f "$fake" "$plain"
 
 assert_eq "$(VOICE_UNAME_OVERRIDE=MINGW64_NT detect_platform)" "windows" "MINGW→windows"
 assert_eq "$(VOICE_PLATFORM_OVERRIDE=mac VOICE_UNAME_OVERRIDE=Linux detect_platform)" "mac" "override 短路"
+assert_eq "$(VOICE_PLATFORM_OVERRIDE=wsl bash "$DIR/../config.sh" --print-platform)" "wsl" "CLI --print-platform block"
 test_summary
