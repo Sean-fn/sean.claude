@@ -21,12 +21,9 @@ hooks/audio/mic_status
 cache/
 image-cache/
 paste-cache/
-plugins/install-counts-cache.json
-plugins/installed_plugins.json
-plugins/known_marketplaces.json
-plugins/blocklist.json
-plugins/config.json
-plugins/marketplaces/claude-plugins-official
+
+# Plugins 全為本地快取／marketplace／catalog 執行期狀態，無檔案被追蹤
+plugins/
 
 # 統計 & 遙測
 stats-cache.json
@@ -55,8 +52,14 @@ bot.pid
 *.out
 *.bak
 jobs/
-deamon/
+daemon/
+daemon.lock
+daemon.status.json
+.last-cleanup
 teams/
 
 # voice_notify secrets
 hooks/audio/channels/telegram/notify.env
+
+# OAuth / MCP 憑證（機密，勿提交）
+.credentials.json
