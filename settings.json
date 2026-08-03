@@ -3,11 +3,11 @@
   "cleanupPeriodDays": 90,
   "env": {
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_BASE_URL": "http://localhost:4141",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-opus-4.8",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-4.8",
-    "ANTHROPIC_MODEL": "claude-opus-4.8",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-opus-4.8",
+    "ANTHROPIC_BASE_URL": "http://localhost:4000",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-opus-5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-5",
+    "ANTHROPIC_MODEL": "claude-opus-5",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-opus-5",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "1",
@@ -120,7 +120,6 @@
     ],
     "defaultMode": "plan"
   },
-  "model": "claude-opus-4.8",
   "hooks": {
     "Notification": [
       {
@@ -207,6 +206,9 @@
       }
     ]
   },
+  "worktree": {
+    "bgIsolation": "none"
+  },
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/hooks/coralline/statusline.sh"
@@ -216,7 +218,7 @@
     "sean-skill-creator@sean-marketplace": true,
     "skill-creator@claude-plugins-official": true,
     "task-swarm@sean-marketplace": true,
-    "telegram@claude-plugins-official": true,
+    "telegram@claude-plugins-official": false,
     "builder@sean-marketplace": true,
     "superpowers@claude-plugins-official": true,
     "claude-mem@thedotmack": true
@@ -258,7 +260,4 @@
   "feedbackSurveyState": {
     "lastShownTime": 1754106537142
   },
-  "worktree": {
-    "bgIsolation": "none"
-  }
 }
